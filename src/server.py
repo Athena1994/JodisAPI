@@ -3,7 +3,7 @@ import logging
 from sqlalchemy import and_, create_engine, func, or_, select, tuple_
 from sqlalchemy.orm import Session
 
-from .models import (Base, Client, ClientConnectionState, Job, JobStatus)
+from models import (Base, Client, ClientConnectionState, Job, JobStatus)
 
 from utils.config_utils import assert_fields_in_dict
 
