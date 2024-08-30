@@ -5,8 +5,8 @@ import logging
 from flask import Blueprint, request
 from injector import inject
 
-from program.config_loader import ConfigLoader
-from program.server.server import Server
+from aithena.trading.config_loader import ConfigLoader
+from server import Server
 
 
 jobs_pb = Blueprint('jobs_pb', __name__)

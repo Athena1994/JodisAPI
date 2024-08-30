@@ -6,8 +6,8 @@ import logging
 from flask import Blueprint, request
 from flask_injector import inject
 
-from program.server.server import Server
-from program.server.models import ClientConnectionState as CCS
+from server import Server
+from models import ClientConnectionState as CCS
 
 
 clients_pb = Blueprint('clients', __name__)

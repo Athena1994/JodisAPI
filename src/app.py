@@ -5,10 +5,10 @@ from flask_cors import CORS
 from flask_injector import FlaskInjector, singleton
 from flask_socketio import SocketIO
 
-from program.server.app.socket_namespaces import ClientEventNamespace
-from program.server.server import Server
-from program.server.app.endpoints.clients import clients_pb
-from program.server.app.endpoints.jobs import jobs_pb
+from server import Server
+from socket_namespaces import ClientEventNamespace
+from endpoints.clients import clients_pb
+from endpoints.jobs import jobs_pb
 
 
 logging.basicConfig(level=logging.INFO)
@@ -17,7 +17,7 @@ PORT = 5000
 
 
 def configure(binder):
-    with open('program/server/sql_test_cfg.json', 'r') as f:
+    with open('sql_test_cfg.json', 'r') as f:
         cfg = Server.Config.from_dict(json.load(f))
 
     binder.bind(Server, to=Server(cfg), scope=singleton)

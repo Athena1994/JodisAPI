@@ -2,7 +2,7 @@ import logging
 from flask import request
 from flask_socketio import Namespace
 
-from program.server.server import Server
+from server import Server
 
 
 class ClientEventNamespace(Namespace):
