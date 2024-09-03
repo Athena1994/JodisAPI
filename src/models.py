@@ -25,7 +25,9 @@ class Job(Base):
 
     states: Mapped[List["JobStatus"]] = relationship(
         back_populates='job', cascade='all, delete-orphan',)
-    client: Mapped["Client"] = relationship(back_populates='job')
+
+    schedule_entry: Mapped["JobScheduleEntry"] = relationship(
+        back_populates='job', cascade='all, delete-orphan', uselist=False)
 
 
 class JobStatus(Base):
@@ -33,9 +35,8 @@ class JobStatus(Base):
         CREATED = 'CREATED'
         RETURNED = 'RETURNED'
 
-        PENDING = 'PENDING'
-        IN_PROGRESS = 'ASSIGNED'
-        PAUSED = 'PAUSED'
+        SCHEDULED = 'SCHEDULED'
+        RUNNING = 'STARTED'
 
         FAILED = 'FAILED'
         FINISHED = 'FINISHED'
@@ -60,16 +61,32 @@ class JobStatus(Base):
     job: Mapped["Job"] = relationship(back_populates='states')
 
 
+class JobScheduleEntry(Base):
+    __tablename__ = 'JobScheduleEntry'
+
+    id: Mapped[int] = mapped_column("Id", primary_key=True, autoincrement=True)
+    job_id: Mapped[int] = mapped_column(
+        "JobId", ForeignKey('Job.Id', ondelete='CASCADE'))
+    client_id: Mapped[int] = mapped_column(
+        "ClientId", ForeignKey('Client.Id', ondelete='CASCADE'))
+
+    rank: Mapped[int] = mapped_column("Rank")
+
+    job: Mapped["Job"] = relationship(back_populates='schedule_entry')
+    client: Mapped["Client"] = relationship(back_populates='schedule')
+
+
 class Client(Base):
     __tablename__ = 'Client'
 
     id: Mapped[int] = mapped_column("Id", primary_key=True, autoincrement=True)
-    job_id: Mapped[int] = mapped_column(
-        "JobId", ForeignKey('Job.Id', ondelete='SET NULL'), nullable=True)
 
     name: Mapped[str] = mapped_column("Name", String(64), nullable=True)
 
-    job: Mapped["Job"] = relationship(back_populates='client')
+    schedule: Mapped[List["JobScheduleEntry"]] = relationship(
+        back_populates='client', cascade='all, delete-orphan',
+        order_by=JobScheduleEntry.rank)
+
     connection_states: Mapped[List["ClientConnectionState"]] \
         = relationship(back_populates='client',
                        cascade='all, delete-orphan',

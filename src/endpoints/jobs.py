@@ -18,19 +18,27 @@ class Job:
     state: str
     sub_state: str
     client_id: int
+    rank: int
     config: dict
     name: str
     description: str
 
     @staticmethod
     def from_db(job):
-        return Job(job.id,
-                   job.states[-1].state.value,
-                   job.states[-1].sub_state.value,
-                   job.client.id if job.client is not None else -1,
-                   job.configuration,
-                   job.name,
-                   job.description)
+        client_id = (
+            job.schedule_entry.client_id
+            if job.schedule_entry is not None else -1
+        )
+        rank = job.schedule_entry.rank if job.schedule_entry is not None else -1
+
+        return Job(id=job.id,
+                   state=job.states[-1].state.value,
+                   sub_state=job.states[-1].sub_state.value,
+                   client_id=client_id,
+                   rank=rank,
+                   config=job.configuration,
+                   name=job.name,
+                   description=job.description)
 
 
 @jobs_pb.route('/jobs', methods=['GET'])
@@ -114,3 +122,66 @@ def create_job(server: Server):
         job = Job.from_db(server.get_job(session, job_id))
         logging.info(f'Created job {job}')
         return [job], 201
+
+
+@jobs_pb.route('/jobs/assign', methods=['POST'])
+@inject
+def assign_jobs(server: Server):
+    if 'jobIds' not in request.json:
+        return {'error': 'Ids not provided'}, 400
+    if 'clientId' not in request.json:
+        return {'error': 'Client id not provided'}, 400
+
+    job_ids = request.json['jobIds']
+    client_id = request.json['clientId']
+
+    if not all(isinstance(i, int) for i in job_ids):
+        return {'error': 'Job ids should be integers'}, 400
+    if not isinstance(client_id, int):
+        return {'error': 'Client id should be an integer'}, 400
+
+    with server.create_session() as session:
+        assigned_jobs = []
+        for id in job_ids:
+            try:
+                updated_job = Job.from_db(
+                    server.assign_job(session, id, client_id))
+                assigned_jobs.append(updated_job)
+            except server.StateError or server.IndexValueError as e:
+                logging.warning(f'Failed to assign job {id}: {str(e)}')
+            except Exception as e:
+                logging.error(f'Failed to assign job {id}: {str(e)}')
+                raise e
+
+        session.commit()
+
+        print(assigned_jobs)
+
+        return assigned_jobs, 200
+
+
+@jobs_pb.route('/jobs/unassign', methods=['POST'])
+@inject
+def unassign_jobs(server: Server):
+    if 'jobIds' not in request.json:
+        return {'error': 'Id not provided'}, 400
+
+    job_ids = request.json['jobIds']
+
+    if not all([isinstance(i, int) for i in job_ids]):
+        return {'error': 'Job ids should be integers'}, 400
+
+    jobs = []
+    with server.create_session() as session:
+        for job_id in job_ids:
+            try:
+                jobs.append(
+                    Job.from_db(server.unassign_job(session, job_id)))
+            except server.StateError or server.IndexValueError as e:
+                logging.warning(f'Failed to unassign job {job_id}: {str(e)}')
+            except Exception as e:
+                logging.error(f'Failed to unassign job {job_id}: {str(e)}')
+                raise e
+
+        session.commit()
+    return jobs, 200

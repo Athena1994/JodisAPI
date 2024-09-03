@@ -3,11 +3,13 @@ import logging
 from sqlalchemy import and_, create_engine, func, or_, select, tuple_
 from sqlalchemy.orm import Session
 
-from models import (Base, Client, ClientConnectionState, Job, JobStatus)
+from src.models import (Base, Client, ClientConnectionState, Job,
+                        JobScheduleEntry, JobStatus)
 
 from utils.config_utils import assert_fields_in_dict
 
 JState = JobStatus.State
+JSubState = JobStatus.SubState
 CState = ClientConnectionState.State
 
 
@@ -62,8 +64,8 @@ class Server:
         if job is None:
             raise Server.IndexValueError(f"Job with id {job_id} not found")
 
-        if job.states[-1].state == JState.ASSIGNED:
-            raise Server.StateError("Assigned jobs cannot be deleted.")
+        if job.states[-1].sub_state == JSubState.RUNNING:
+            raise Server.StateError("Active jobs cannot be deleted.")
 
         session.delete(job)
         session.commit()
@@ -118,15 +120,55 @@ class Server:
             session.commit()
             return job.id
 
-    def assign_job(self, job_id: int):
-        with Session(self._engine) as session:
-            job = session.query(Job).filter(Job.id == job_id).first()
-            if job is None:
-                raise ValueError(f"Job with id {job_id} not found")
+    def unassign_job(self, session: Session, job_id: int):
 
-            job.states.append(JobStatus(s=JobStatus.State.ASSIGNED,
-                                        sub_state=JobStatus.SubState.PENDING))
-            session.commit()
+        job = session.execute(select(Job).
+                              where(Job.id == job_id)).scalar()
+        if job is None:
+            raise Server.IndexValueError(
+                f"Job with id {job_id} not found")
+
+        if job.schedule_entry is None:
+            return
+
+        if job.states[-1].sub_state == JobStatus.SubState.RUNNING:
+            raise Server.StateError(
+                "Cannot unassign job that is running")
+
+        job.schedule_entry = None
+        job.states.append(JobStatus(
+            state=JobStatus.State.UNASSIGNED,
+            sub_state=JobStatus.SubState.CREATED))
+        return job
+
+    def assign_job(self, session: Session, job_id: int, client_id: int):
+        job = session.execute(select(Job).
+                              where(Job.id == job_id)).scalar()
+        if job is None:
+            raise Server.IndexValueError(
+                f"Job with id {job_id} not found")
+
+        client = session.execute(select(Client).
+                                 where(Client.id == client_id)).scalar()
+        if client is None:
+            raise Server.IndexValueError(
+                f"Client with id {client_id} not found")
+
+        if job.schedule_entry is not None:
+            raise Server.StateError(
+                "Job already assigned to a client")
+
+        next_rank = 0 if len(client.schedule) == 0 \
+            else client.schedule[-1].rank + 1
+
+        job.schedule_entry = JobScheduleEntry(
+            client_id=client_id,
+            rank=next_rank)
+
+        job.states.append(JobStatus(state=JobStatus.State.ASSIGNED,
+                                    sub_state=JobStatus.SubState.SCHEDULED))
+
+        return job
 
     def add_client(self, name: str):
         client = Client(name=name)

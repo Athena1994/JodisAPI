@@ -15,8 +15,10 @@ clients_pb = Blueprint('clients', __name__)
 
 @dataclass
 class Client:
+    id: int
     name: str
     connected: bool
+    jobIds: list[int]
 
 
 @clients_pb.route('/client/register', methods=['POST'])
@@ -38,6 +40,8 @@ def get_clients(server: Server):
     with server.create_session() as session:
         for c in server.get_all_clients(session):
             clients.append(Client(
+                jobIds=[j.job.id for j in c.schedule],
+                id=c.id,
                 name=c.name,
                 connected=c.connection_states[-1].state == CCS.State.CONNECTED))
 
