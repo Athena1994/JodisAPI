@@ -15,12 +15,14 @@ logging.basicConfig(level=logging.INFO)
 
 PORT = 5000
 
+with open('sql_test_cfg.json', 'r') as f:
+    cfg = Server.Config.from_dict(json.load(f))
+
+server = Server(cfg)
+
 
 def configure(binder):
-    with open('sql_test_cfg.json', 'r') as f:
-        cfg = Server.Config.from_dict(json.load(f))
-
-    binder.bind(Server, to=Server(cfg), scope=singleton)
+    binder.bind(Server, to=server, scope=singleton)
 
 
 app = Flask(__name__)
@@ -30,7 +32,7 @@ app.register_blueprint(jobs_pb)
 CORS(app)
 
 socketio = SocketIO(app)
-socketio.on_namespace(ClientEventNamespace('/client'))
+socketio.on_namespace(ClientEventNamespace('/client', server))
 
 FlaskInjector(app=app, modules=[configure])
 

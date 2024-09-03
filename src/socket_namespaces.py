@@ -7,10 +7,10 @@ from server import Server
 
 class ClientEventNamespace(Namespace):
 
-    def __init__(self, server: Server):
-        super().__init__()
+    def __init__(self, name: str, server: Server):
+        super().__init__(name)
         self._server = server
-        print(server)
+        print(type(server))
 
     def on_connect(self):
         logging.info(f'Socket with id {request.sid} connected')

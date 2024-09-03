@@ -178,8 +178,7 @@ class Server:
             return client.id
 
     def get_all_clients(self, session):
-        result = session.query(Client).all()
-        return result
+        return session.execute(select(Client)).scalars()
 
     def register_socket(self, socket_id: int, client_id: int):
         if socket_id in self._socket_to_client:

@@ -39,10 +39,13 @@ def get_clients(server: Server):
     clients = []
     with server.create_session() as session:
         for c in server.get_all_clients(session):
+            is_connected = \
+                c.connection_states[-1].state.value == CCS.State.CONNECTED.value
+
             clients.append(Client(
                 jobIds=[j.job.id for j in c.schedule],
                 id=c.id,
                 name=c.name,
-                connected=c.connection_states[-1].state == CCS.State.CONNECTED))
+                connected=is_connected))
 
     return clients

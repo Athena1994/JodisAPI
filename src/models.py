@@ -76,23 +76,6 @@ class JobScheduleEntry(Base):
     client: Mapped["Client"] = relationship(back_populates='schedule')
 
 
-class Client(Base):
-    __tablename__ = 'Client'
-
-    id: Mapped[int] = mapped_column("Id", primary_key=True, autoincrement=True)
-
-    name: Mapped[str] = mapped_column("Name", String(64), nullable=True)
-
-    schedule: Mapped[List["JobScheduleEntry"]] = relationship(
-        back_populates='client', cascade='all, delete-orphan',
-        order_by=JobScheduleEntry.rank)
-
-    connection_states: Mapped[List["ClientConnectionState"]] \
-        = relationship(back_populates='client',
-                       cascade='all, delete-orphan',
-                       passive_deletes=True)
-
-
 class ClientConnectionState(Base):
     class State(enum.Enum):
         CONNECTED = 'CONNECTED'
@@ -110,6 +93,24 @@ class ClientConnectionState(Base):
         'Timestamp', default=func.current_timestamp())
 
     client: Mapped["Client"] = relationship(back_populates='connection_states')
+
+
+class Client(Base):
+    __tablename__ = 'Client'
+
+    id: Mapped[int] = mapped_column("Id", primary_key=True, autoincrement=True)
+
+    name: Mapped[str] = mapped_column("Name", String(64), nullable=True)
+
+    schedule: Mapped[List["JobScheduleEntry"]] = relationship(
+        back_populates='client', cascade='all, delete-orphan',
+        order_by=JobScheduleEntry.rank)
+
+    connection_states: Mapped[List["ClientConnectionState"]] \
+        = relationship(back_populates='client',
+                       cascade='all, delete-orphan',
+                       passive_deletes=True,
+                       order_by=ClientConnectionState.timestamp)
 
 
 ConnectionState = ClientConnectionState.State
