@@ -11,7 +11,7 @@ from endpoints.clients import clients_pb
 from endpoints.jobs import jobs_pb
 
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 
 PORT = 5000
 

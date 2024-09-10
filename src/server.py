@@ -1,16 +1,17 @@
 from dataclasses import dataclass
 import logging
+import flask_socketio
+import socketio
 from sqlalchemy import and_, create_engine, func, or_, select, tuple_
 from sqlalchemy.orm import Session
 
-from src.models import (Base, Client, ClientConnectionState, Job,
+from src.models import (Base, Client, Job,
                         JobScheduleEntry, JobStatus)
 
 from utils.config_utils import assert_fields_in_dict
 
 JState = JobStatus.State
 JSubState = JobStatus.SubState
-CState = ClientConnectionState.State
 
 
 class Server:
@@ -54,6 +55,9 @@ class Server:
 
         self._socket_to_client = {}
         self._client_to_socket = {}
+
+    def get_client_id(self, socket_id: int) -> int | None:
+        return self._socket_to_client.get(socket_id)
 
     def create_session(self) -> Session:
         return Session(self._engine)
@@ -170,6 +174,62 @@ class Server:
 
         return job
 
+    def get_running_job(self, session: Session, client_id: int) -> Job | None:
+
+        return session.execute(
+            select(Job)
+            .where(
+                and_(
+                    Job.id.in_(
+                        select(JobScheduleEntry.job_id)
+                        .where(JobScheduleEntry.client_id == client_id)),
+                    Job.id.in_(
+                        select(JobStatus.job_id)
+                        .where(
+                            and_(
+                                JobStatus.sub_state == JSubState.RUNNING,
+                                tuple_(JobStatus.job_id,
+                                       JobStatus.creation_timestamp).in_(
+                                    select(
+                                        JobStatus.job_id,
+                                        func.max(JobStatus.creation_timestamp))
+                                    .group_by(JobStatus.job_id)
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+        ).scalar()
+
+    def start_next_job(self, session: Session, client_id: int) -> Job | None:
+
+        if self.get_running_job(session, client_id) is not None:
+            raise Server.StateError("Client already has a running job")
+
+        next_job = session.execute(
+            select(Job)
+            .where(Job.id.in_(
+                select(JobScheduleEntry.job_id)
+                .where(tuple_(JobScheduleEntry.client_id,
+                              JobScheduleEntry.rank).in_(
+                    select(JobScheduleEntry.client_id,
+                           func.min(JobScheduleEntry.rank))
+                    .where(JobScheduleEntry.client_id == client_id)
+                    .group_by(JobScheduleEntry.client_id)
+                ))
+            ))
+        ).scalar()
+
+        if next_job is None:
+            return None
+
+        next_job.states.append(JobStatus(
+            state=JobStatus.State.ASSIGNED,
+            sub_state=JobStatus.SubState.RUNNING))
+
+        return next_job
+
     def add_client(self, name: str):
         client = Client(name=name)
         with Session(self._engine) as session:
@@ -177,28 +237,24 @@ class Server:
             session.commit()
             return client.id
 
-    def get_all_clients(self, session):
-        return session.execute(select(Client)).scalars()
+    def get_client(self, session: Session, client_id: int):
+        client = session.execute(
+            select(Client).where(Client.id == client_id)).scalar()
+
+        return client
+
+    def is_client_connected(self, client: Client):
+        return client.id in self._client_to_socket
+
+    def get_all_clients(self, session: Session):
+        return session.execute(select(Client)).scalars().all()
 
     def register_socket(self, socket_id: int, client_id: int):
         if socket_id in self._socket_to_client:
             raise ValueError(f"Socket {socket_id} already registered")
 
-        with Session(self._engine) as session:
-
-            client = session.query(Client)\
-                .filter(Client.id == client_id)\
-                .first()
-            if client is None:
-                raise ValueError(f"Client with id {client_id} not found")
-
-            self._socket_to_client[socket_id] = client_id
-            self._client_to_socket[client_id] = socket_id
-
-            client.connection_states.append(
-                ClientConnectionState(state=CState.CONNECTED,
-                                      message='Connected'))
-            session.commit()
+        self._socket_to_client[socket_id] = client_id
+        self._client_to_socket[client_id] = socket_id
 
     def deregister_socket(self, socket_id: int) -> int:
         if socket_id not in self._socket_to_client:
@@ -209,18 +265,25 @@ class Server:
         del self._socket_to_client[socket_id]
         del self._client_to_socket[client_id]
 
-        with Session(self._engine) as session:
-            client = session.query(Client)\
-                .filter(Client.id == client_id)\
-                .first()
-            client.connection_states.append(
-                ClientConnectionState(
-                    state=ClientConnectionState.State.DISCONNECTED,
-                    message='Disonnected'))
-            session.commit()
-
         return client_id
 
     def create_tables(self):
         Base.metadata.drop_all(self._engine)
         Base.metadata.create_all(self._engine)
+
+    def request_client_state(self, client: Client, active: bool):
+        client = self.get_client(client.id)
+
+        sid = self._client_to_socket.get(client.id)
+        if sid is None:
+            raise ValueError(f"Client {client.id} not connected)")
+
+        if active:
+            flask_socketio.emit('request_activation', to=sid)
+        else:
+            flask_socketio.emit('request_release', to=sid)
+
+        client.state = Client.State.ACTIVE if active else Client.State.SUSPENDED
+        with Session(self._engine) as session:
+            session.commit()
+        return client.state

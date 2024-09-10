@@ -36,7 +36,7 @@ class JobStatus(Base):
         RETURNED = 'RETURNED'
 
         SCHEDULED = 'SCHEDULED'
-        RUNNING = 'STARTED'
+        RUNNING = 'RUNNING'
 
         FAILED = 'FAILED'
         FINISHED = 'FINISHED'
@@ -76,44 +76,21 @@ class JobScheduleEntry(Base):
     client: Mapped["Client"] = relationship(back_populates='schedule')
 
 
-class ClientConnectionState(Base):
-    class State(enum.Enum):
-        CONNECTED = 'CONNECTED'
-        DISCONNECTED = 'DISCONNECTED'
-
-    __tablename__ = 'ClientConnectionState'
-
-    id: Mapped[int] = mapped_column("Id", primary_key=True, autoincrement=True)
-    client_id: Mapped[int] = mapped_column(
-        "ClientId", ForeignKey('Client.Id', ondelete='CASCADE'))
-
-    state: Mapped[State] = mapped_column("State")
-    message: Mapped[str] = mapped_column("Message", String(128), nullable=True)
-    timestamp: Mapped[datetime] = mapped_column(
-        'Timestamp', default=func.current_timestamp())
-
-    client: Mapped["Client"] = relationship(back_populates='connection_states')
-
-
 class Client(Base):
     __tablename__ = 'Client'
+
+    class State(enum.Enum):
+        ACTIVE = 'ACTIVE'
+        SUSPENDED = 'SUSPENDED'
 
     id: Mapped[int] = mapped_column("Id", primary_key=True, autoincrement=True)
 
     name: Mapped[str] = mapped_column("Name", String(64), nullable=True)
-
     schedule: Mapped[List["JobScheduleEntry"]] = relationship(
         back_populates='client', cascade='all, delete-orphan',
         order_by=JobScheduleEntry.rank)
-
-    connection_states: Mapped[List["ClientConnectionState"]] \
-        = relationship(back_populates='client',
-                       cascade='all, delete-orphan',
-                       passive_deletes=True,
-                       order_by=ClientConnectionState.timestamp)
-
-
-ConnectionState = ClientConnectionState.State
+    state: Mapped[State] = mapped_column(
+        "State", nullable=False, default=State.SUSPENDED)
 
 
 def create_initial_job_status(mapper,
@@ -124,12 +101,4 @@ def create_initial_job_status(mapper,
     target.states.append(status)
 
 
-def create_initial_connection(mapper,
-                              connection,
-                              target: Client):
-    status = ClientConnectionState(state=ConnectionState.DISCONNECTED)
-    target.connection_states.append(status)
-
-
 event.listen(Job, 'after_insert', create_initial_job_status)
-event.listen(Client, 'after_insert', create_initial_connection)

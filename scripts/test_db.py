@@ -1,7 +1,7 @@
 import json
 from src.server import Server
 
-with open('../sql_test_cfg.json', 'r') as f:
+with open('sql_test_cfg.json', 'r') as f:
     cfg = Server.Config.from_dict(json.load(f))
 
 s = Server(cfg)
