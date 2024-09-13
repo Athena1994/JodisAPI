@@ -74,3 +74,25 @@ class ClientEventNamespace(Namespace):
             session.commit()
 
         self.emit('success', {'id': client_id, 'state': target_state})
+
+    def on_claim_next_job(self):
+        client_id = self._server.get_client_id(request.sid)
+        if client_id is None:
+            logging.warning(f'Attempt to claim job on unclaimed socket '
+                            f'{request.sid}')
+            self.emit('error', {'message': 'Socket is not claimed'})
+            return
+
+        logging.debug(f'Client {client_id} claiming next job')
+        with self._server.create_session() as session:
+            try:
+                job = self._server.start_next_job(session, client_id)
+            except self._server.StateError as e:
+                logging.warning(f'Failed to claim job: {str(e)}')
+                self.emit('error', {'message': str(e)})
+                return
+            if job is None:
+                self.emit('error', {'message': 'No jobs available'})
+                return
+
+            self.emit('job_claimed', {'id': job.id})

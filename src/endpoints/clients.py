@@ -32,22 +32,36 @@ def register_client(server: Server):
         'message': 'Client registered',
         'id': id})
 
+
 @clients_pb.route('/client/request_state', methods=['POST'])
 @inject
 def request_client_state(server: Server):
-    id = int(request.args.get('clientId'))
-    active = request.args.get('active')
+    if 'clientId' not in request.json or 'active' not in request.json:
+        logging.warning('Missing parameters')
+        return json.dumps({
+            'status': 'error',
+            'message': 'Missing parameters'}), 400
 
-    server.request_client_state(id, active)
+    id = int(request.json['clientId'])
+    active = request.json['active']
 
     with server.create_session() as session:
+
         client = server.get_client(session, id)
+        if client is None:
+            return json.dumps({
+                'status': 'error',
+                'message': 'Client not found'}), 404
+
+        server.request_client_state(session, client, active)
+
         return json.dumps({
             'status': 'ok',
             'message': 'Client state retrieved',
             'id': client.id,
             'name': client.name,
-            'state': client.state.value})
+            'state': client.state.value}), 200
+
 
 @clients_pb.route('/clients', methods=['GET'])
 @inject
@@ -60,6 +74,6 @@ def get_clients(server: Server):
                 id=c.id,
                 name=c.name,
                 state=c.state.value,
-                connected=server.is_client_connected(c)))
+                connected=server.is_client_connected(c))), 200
 
     return clients

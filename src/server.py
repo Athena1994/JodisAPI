@@ -228,6 +228,8 @@ class Server:
             state=JobStatus.State.ASSIGNED,
             sub_state=JobStatus.SubState.RUNNING))
 
+        session.commit()
+
         return next_job
 
     def add_client(self, name: str):
@@ -271,19 +273,17 @@ class Server:
         Base.metadata.drop_all(self._engine)
         Base.metadata.create_all(self._engine)
 
-    def request_client_state(self, client: Client, active: bool):
-        client = self.get_client(client.id)
+    def request_client_state(self, session: Session,
+                             client: Client, active: bool):
 
         sid = self._client_to_socket.get(client.id)
         if sid is None:
             raise ValueError(f"Client {client.id} not connected)")
 
         if active:
-            flask_socketio.emit('request_activation', to=sid)
+            flask_socketio.emit('request_activation',
+                                to=sid, namespace='/client')
         else:
-            flask_socketio.emit('request_release', to=sid)
+            flask_socketio.emit('request_release',
+                                to=sid, namespace='/client')
 
-        client.state = Client.State.ACTIVE if active else Client.State.SUSPENDED
-        with Session(self._engine) as session:
-            session.commit()
-        return client.state
