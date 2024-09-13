@@ -1,3 +1,4 @@
+
 import logging
 from flask import request
 from flask_socketio import Namespace
@@ -7,21 +8,32 @@ from server import Server
 
 class ClientEventNamespace(Namespace):
 
-    def __init__(self, name: str, server: Server):
-        super().__init__(name)
+    def __init__(self, server: Server):
+        super().__init__('/client')
         self._server = server
-        print(type(server))
+
+    def _drop_claim(self, sid: int) -> bool:
+        client_id = self._server.deregister_socket(sid)
+        if client_id is not None:
+            logging.info(f'Claim on client {client_id} dropped '
+                         f'(socket {request.sid})')
+            self.emit('client-connection-changed',
+                      {'id': client_id, 'connected': False},
+                      namespace='/update')
+            return True
+        return False
 
     def on_connect(self):
         logging.info(f'Socket with id {request.sid} connected')
 
     def on_disconnect(self):
-        client_id = self._server.deregister_socket(request.sid)
-        if client_id is not None:
-            logging.info(f'Client {client_id} disconnected '
-                         f'(socket {request.sid})')
-        else:
-            logging.info(f'Unassigned socket {request.sid} disconnected')
+        self._drop_claim(request.sid)
+        logging.info(f'socket {request.sid} disconnected')
+
+    def on_drop_claim(self):
+        if not self._drop_claim(request.sid):
+            logging.warning(f'Unassigned socket {request.sid} tried to drop'
+                            ' claim')
 
     def on_get_clients(self):
         logging.debug('Getting clients')
@@ -39,23 +51,19 @@ class ClientEventNamespace(Namespace):
         try:
             self._server.register_socket(request.sid, client_id)
             logging.info(f'Socket {request.sid} claimed client {client_id}')
+            self.emit('client-connection-changed',
+                      {'id': client_id, 'connected': True},
+                      namespace='/update')
             with self._server.create_session() as session:
                 client = self._server.get_client(session, client_id)
                 self.emit('claim_successfull',
                           {'id': client_id,
                            'name': client.name,
                            'state': client.state.value})
+
         except ValueError as e:
             logging.warning(f'Claim failed! {e}')
             self.emit('error', {'message': str(e)})
-
-    def on_drop_claim(self):
-        client_id = self._server.deregister_socket(request.sid)
-        if client_id is not None:
-            logging.info(f'Client {client_id} dropped claim '
-                         f'(socket {request.sid})')
-        else:
-            logging.warning(f'Unassigned socket {request.sid} dropped claim')
 
     def on_set_state(self, active: bool):
         client_id = self._server.get_client_id(request.sid)
