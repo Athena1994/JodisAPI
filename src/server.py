@@ -56,6 +56,9 @@ class Server:
         self._socket_to_client = {}
         self._client_to_socket = {}
 
+    def emit_update(self, event: str, args: dict):
+        flask_socketio.emit(event, args, namespace='/update', broadcast=True)
+
     def create_tables(self):
         Base.metadata.drop_all(self._engine)
         Base.metadata.create_all(self._engine)
@@ -143,10 +146,17 @@ class Server:
 
         session.commit()
 
+        self.emit_update('job-changed', {
+            'id': next_job.id,
+            'updates': {
+                'state': next_job.states[-1].state.value,
+                'sub_state': next_job.states[-1].sub_state.value
+            }
+        })
+
         return next_job
 
-    def request_client_state(self, session: Session,
-                             client: Client, active: bool):
+    def request_client_state(self, client: Client, active: bool):
 
         sid = self._client_to_socket.get(client.id)
         if sid is None:
@@ -271,6 +281,15 @@ class Server:
         job.states.append(JobStatus(
             state=JobStatus.State.UNASSIGNED,
             sub_state=JobStatus.SubState.CREATED))
+
+        self.emit_update('job-changed', {
+            'id': job.id,
+            'updates': {
+                'state': job.states[-1].state.value,
+                'sub_state': job.states[-1].sub_state.value
+            }
+        })
+
         return job
 
     # --- socket management ---
