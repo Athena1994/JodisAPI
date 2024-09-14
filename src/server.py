@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 import logging
 import flask_socketio
-import socketio
 from sqlalchemy import and_, create_engine, func, or_, select, tuple_
 from sqlalchemy.orm import Session
 
@@ -169,6 +168,30 @@ class Server:
             flask_socketio.emit('request_release',
                                 to=sid, namespace='/client')
 
+    def request_pause_job(self, client: Client):
+
+        sid = self._client_to_socket.get(client.id)
+        if sid is None:
+            raise ValueError(f"Client {client.id} not connected)")
+
+        if client.state != Client.State.SUSPENDED:
+            raise Server.StateError("Client must be suspended")
+
+        flask_socketio.emit('pause_job',
+                            to=sid, namespace='/client')
+
+    def request_cancel_job(self, client: Client):
+
+        sid = self._client_to_socket.get(client.id)
+        if sid is None:
+            raise ValueError(f"Client {client.id} not connected)")
+
+        if client.state != Client.State.SUSPENDED:
+            raise Server.StateError("Client must be suspended")
+
+        flask_socketio.emit('cancel_job',
+                            to=sid, namespace='/client')
+
     # --- job management ---
 
     def get_jobs(self,
@@ -221,13 +244,13 @@ class Server:
             session.commit()
             return job.id
 
-    def delete_job(self, session: Session, job_id: int):
+    def delete_job(self, session: Session, job_id: int, force: bool):
         logging.info(f"Deleting job with id {job_id}")
         job = session.execute(select(Job).where(Job.id == job_id)).scalar()
         if job is None:
             raise Server.IndexValueError(f"Job with id {job_id} not found")
 
-        if job.states[-1].sub_state == JSubState.RUNNING:
+        if job.states[-1].sub_state == JSubState.RUNNING and not force:
             raise Server.StateError("Active jobs cannot be deleted.")
 
         session.delete(job)
@@ -262,7 +285,7 @@ class Server:
 
         return job
 
-    def unassign_job(self, session: Session, job_id: int):
+    def unassign_job(self, session: Session, job_id: int, force: bool):
 
         job = session.execute(select(Job).
                               where(Job.id == job_id)).scalar()
@@ -273,7 +296,7 @@ class Server:
         if job.schedule_entry is None:
             return
 
-        if job.states[-1].sub_state == JobStatus.SubState.RUNNING:
+        if job.states[-1].sub_state == JobStatus.SubState.RUNNING and not force:
             raise Server.StateError(
                 "Cannot unassign job that is running")
 

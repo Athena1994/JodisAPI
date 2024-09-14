@@ -77,6 +77,7 @@ def delete_jobs(server: Server):
         return {'error': 'Ids not provided'}, 400
 
     ids = request.json['ids']
+    force = 'force' in request.json and request.json['force']
 
     if not all(isinstance(i, int) for i in ids):
         return {'error': 'Ids should be integers'}, 400
@@ -85,12 +86,14 @@ def delete_jobs(server: Server):
     with server.create_session() as session:
         for id in ids:
             try:
-                server.delete_job(session, id)
+                server.delete_job(session, id, force)
                 deleted_ids.append(id)
             except server.StateError or server.IndexValueError as e:
                 logging.warning(f'Failed to delete job {id}: {str(e)}')
             except Exception as e:
                 logging.error(f'Failed to delete job {id}: {str(e)}')
+
+    server.emit_update('jobs-deleted', {'ids': deleted_ids})
 
     return {'deletedIds': deleted_ids}, 200
 
@@ -168,15 +171,19 @@ def unassign_jobs(server: Server):
 
     job_ids = request.json['jobIds']
 
+    force = 'force' in request.json and request.json['force']
+
+    logging.info(f'Unassigning jobs {job_ids} (force={force})')
+
     if not all([isinstance(i, int) for i in job_ids]):
         return {'error': 'Job ids should be integers'}, 400
 
-    jobs = []
+    jobs: list[Job] = []
     with server.create_session() as session:
         for job_id in job_ids:
             try:
                 jobs.append(
-                    Job.from_db(server.unassign_job(session, job_id)))
+                    Job.from_db(server.unassign_job(session, job_id, force)))
             except server.StateError or server.IndexValueError as e:
                 logging.warning(f'Failed to unassign job {job_id}: {str(e)}')
             except Exception as e:
@@ -184,4 +191,17 @@ def unassign_jobs(server: Server):
                 raise e
 
         session.commit()
+
+    for job in jobs:
+        server.emit_update(
+            'job-update', {
+                'id': job.id,
+                'updates': {
+                    'state': job.state,
+                    'subState': job.sub_state,
+                    'clientId': job.client_id
+                }
+            }
+        )
+
     return jobs, 200

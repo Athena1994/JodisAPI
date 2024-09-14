@@ -33,34 +33,42 @@ def register_client(server: Server):
         'id': id})
 
 
-@clients_pb.route('/client/request_state', methods=['POST'])
+@clients_pb.route('/client/request', methods=['POST'])
 @inject
-def request_client_state(server: Server):
-    if 'clientId' not in request.json or 'active' not in request.json:
+def server_request(server: Server):
+    if ('clientId' not in request.json
+       or 'cmd' not in request.json
+       or 'args' not in request.json):
         logging.warning('Missing parameters')
         return json.dumps({
             'status': 'error',
             'message': 'Missing parameters'}), 400
 
     id = int(request.json['clientId'])
-    active = request.json['active']
+    cmd = request.json['cmd']
+    args = request.json['args']
 
     with server.create_session() as session:
-
         client = server.get_client(session, id)
         if client is None:
             return json.dumps({
                 'status': 'error',
                 'message': 'Client not found'}), 404
 
-        server.request_client_state(session, client, active)
+        if cmd == 'change_state':
+            server.request_client_state(client, args['active'])
+            msg = 'Client state change requested'
+        elif cmd == 'pause_job':
+            server.request_pause_job(client)
+            msg = 'Job pause requested'
+        elif cmd == 'cancel_job':
+            server.request_cancel_job(client)
+            msg = 'Job cancel requested'
 
         return json.dumps({
             'status': 'ok',
-            'message': 'Client state retrieved',
-            'id': client.id,
-            'name': client.name,
-            'state': client.state.value}), 200
+            'message': msg
+        }), 200
 
 
 @clients_pb.route('/clients', methods=['GET'])
