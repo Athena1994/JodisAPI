@@ -56,123 +56,36 @@ class Server:
         self._socket_to_client = {}
         self._client_to_socket = {}
 
-    def get_client_id(self, socket_id: int) -> int | None:
-        return self._socket_to_client.get(socket_id)
+    def create_tables(self):
+        Base.metadata.drop_all(self._engine)
+        Base.metadata.create_all(self._engine)
 
     def create_session(self) -> Session:
         return Session(self._engine)
 
-    def delete_job(self, session: Session, job_id: int):
-        logging.info(f"Deleting job with id {job_id}")
-        job = session.execute(select(Job).where(Job.id == job_id)).scalar()
-        if job is None:
-            raise Server.IndexValueError(f"Job with id {job_id} not found")
+    # --- client management ---
 
-        if job.states[-1].sub_state == JSubState.RUNNING:
-            raise Server.StateError("Active jobs cannot be deleted.")
-
-        session.delete(job)
-        session.commit()
-
-    def get_jobs(self,
-                 session: Session,
-                 include_unassigned: bool,
-                 include_finished: bool,
-                 include_assigned: bool):
-        most_recent_state_stmt = (
-            select(JobStatus.job_id, JobStatus.state)
-            .where(
-                tuple_(JobStatus.job_id, JobStatus.creation_timestamp)
-                .in_(
-                    select(JobStatus.job_id,
-                           func.max(JobStatus.creation_timestamp))
-                    .group_by(JobStatus.job_id)))
-        )
-
-        jobs_stmt = (
-            select(Job)
-            .where(
-                or_(
-                    and_(include_unassigned,
-                         tuple_(Job.id, JState.UNASSIGNED.value)
-                         .in_(most_recent_state_stmt)),
-                    and_(include_assigned,
-                         tuple_(Job.id, JState.ASSIGNED.value)
-                         .in_(most_recent_state_stmt)),
-                    and_(include_finished,
-                         tuple_(Job.id, JState.FINISHED.value)
-                         .in_(most_recent_state_stmt))
-                )
-            )
-        )
-        result = session.execute(jobs_stmt).scalars()
-        return result
-
-    def get_job(self,
-                session: Session,
-                job_id: int):
-        return session.execute(
-            select(Job).where(Job.id == job_id)
-        ).scalar()
-
-    def add_job(self, job_config: dict, name: str, desc: str) -> int:
+    def add_client(self, name: str):
+        client = Client(name=name)
         with Session(self._engine) as session:
-            job = Job(configuration=job_config,
-                      name=name,
-                      description=desc)
-            session.add(job)
+            session.add(client)
             session.commit()
-            return job.id
+            return client.id
 
-    def unassign_job(self, session: Session, job_id: int):
+    def get_client(self, session: Session, client_id: int):
+        client = session.execute(
+            select(Client).where(Client.id == client_id)).scalar()
 
-        job = session.execute(select(Job).
-                              where(Job.id == job_id)).scalar()
-        if job is None:
-            raise Server.IndexValueError(
-                f"Job with id {job_id} not found")
+        return client
 
-        if job.schedule_entry is None:
-            return
+    def get_all_clients(self, session: Session):
+        return session.execute(select(Client)).scalars().all()
 
-        if job.states[-1].sub_state == JobStatus.SubState.RUNNING:
-            raise Server.StateError(
-                "Cannot unassign job that is running")
+    def get_client_id(self, socket_id: int) -> int | None:
+        return self._socket_to_client.get(socket_id)
 
-        job.schedule_entry = None
-        job.states.append(JobStatus(
-            state=JobStatus.State.UNASSIGNED,
-            sub_state=JobStatus.SubState.CREATED))
-        return job
-
-    def assign_job(self, session: Session, job_id: int, client_id: int):
-        job = session.execute(select(Job).
-                              where(Job.id == job_id)).scalar()
-        if job is None:
-            raise Server.IndexValueError(
-                f"Job with id {job_id} not found")
-
-        client = session.execute(select(Client).
-                                 where(Client.id == client_id)).scalar()
-        if client is None:
-            raise Server.IndexValueError(
-                f"Client with id {client_id} not found")
-
-        if job.schedule_entry is not None:
-            raise Server.StateError(
-                "Job already assigned to a client")
-
-        next_rank = 0 if len(client.schedule) == 0 \
-            else client.schedule[-1].rank + 1
-
-        job.schedule_entry = JobScheduleEntry(
-            client_id=client_id,
-            rank=next_rank)
-
-        job.states.append(JobStatus(state=JobStatus.State.ASSIGNED,
-                                    sub_state=JobStatus.SubState.SCHEDULED))
-
-        return job
+    def is_client_connected(self, client: Client):
+        return client.id in self._client_to_socket
 
     def get_running_job(self, session: Session, client_id: int) -> Job | None:
 
@@ -232,24 +145,135 @@ class Server:
 
         return next_job
 
-    def add_client(self, name: str):
-        client = Client(name=name)
+    def request_client_state(self, session: Session,
+                             client: Client, active: bool):
+
+        sid = self._client_to_socket.get(client.id)
+        if sid is None:
+            raise ValueError(f"Client {client.id} not connected)")
+
+        if active:
+            flask_socketio.emit('request_activation',
+                                to=sid, namespace='/client')
+        else:
+            flask_socketio.emit('request_release',
+                                to=sid, namespace='/client')
+
+    # --- job management ---
+
+    def get_jobs(self,
+                 session: Session,
+                 include_unassigned: bool,
+                 include_finished: bool,
+                 include_assigned: bool):
+        most_recent_state_stmt = (
+            select(JobStatus.job_id, JobStatus.state)
+            .where(
+                tuple_(JobStatus.job_id, JobStatus.creation_timestamp)
+                .in_(
+                    select(JobStatus.job_id,
+                           func.max(JobStatus.creation_timestamp))
+                    .group_by(JobStatus.job_id)))
+        )
+
+        jobs_stmt = (
+            select(Job)
+            .where(
+                or_(
+                    and_(include_unassigned,
+                         tuple_(Job.id, JState.UNASSIGNED.value)
+                         .in_(most_recent_state_stmt)),
+                    and_(include_assigned,
+                         tuple_(Job.id, JState.ASSIGNED.value)
+                         .in_(most_recent_state_stmt)),
+                    and_(include_finished,
+                         tuple_(Job.id, JState.FINISHED.value)
+                         .in_(most_recent_state_stmt))
+                )
+            )
+        )
+        result = session.execute(jobs_stmt).scalars()
+        return result
+
+    def get_job(self,
+                session: Session,
+                job_id: int):
+        return session.execute(
+            select(Job).where(Job.id == job_id)
+        ).scalar()
+
+    def add_job(self, job_config: dict, name: str, desc: str) -> int:
         with Session(self._engine) as session:
-            session.add(client)
+            job = Job(configuration=job_config,
+                      name=name,
+                      description=desc)
+            session.add(job)
             session.commit()
-            return client.id
+            return job.id
 
-    def get_client(self, session: Session, client_id: int):
-        client = session.execute(
-            select(Client).where(Client.id == client_id)).scalar()
+    def delete_job(self, session: Session, job_id: int):
+        logging.info(f"Deleting job with id {job_id}")
+        job = session.execute(select(Job).where(Job.id == job_id)).scalar()
+        if job is None:
+            raise Server.IndexValueError(f"Job with id {job_id} not found")
 
-        return client
+        if job.states[-1].sub_state == JSubState.RUNNING:
+            raise Server.StateError("Active jobs cannot be deleted.")
 
-    def is_client_connected(self, client: Client):
-        return client.id in self._client_to_socket
+        session.delete(job)
+        session.commit()
 
-    def get_all_clients(self, session: Session):
-        return session.execute(select(Client)).scalars().all()
+    def assign_job(self, session: Session, job_id: int, client_id: int):
+        job = session.execute(select(Job).
+                              where(Job.id == job_id)).scalar()
+        if job is None:
+            raise Server.IndexValueError(
+                f"Job with id {job_id} not found")
+
+        client = session.execute(select(Client).
+                                 where(Client.id == client_id)).scalar()
+        if client is None:
+            raise Server.IndexValueError(
+                f"Client with id {client_id} not found")
+
+        if job.schedule_entry is not None:
+            raise Server.StateError(
+                "Job already assigned to a client")
+
+        next_rank = 0 if len(client.schedule) == 0 \
+            else client.schedule[-1].rank + 1
+
+        job.schedule_entry = JobScheduleEntry(
+            client_id=client_id,
+            rank=next_rank)
+
+        job.states.append(JobStatus(state=JobStatus.State.ASSIGNED,
+                                    sub_state=JobStatus.SubState.SCHEDULED))
+
+        return job
+
+    def unassign_job(self, session: Session, job_id: int):
+
+        job = session.execute(select(Job).
+                              where(Job.id == job_id)).scalar()
+        if job is None:
+            raise Server.IndexValueError(
+                f"Job with id {job_id} not found")
+
+        if job.schedule_entry is None:
+            return
+
+        if job.states[-1].sub_state == JobStatus.SubState.RUNNING:
+            raise Server.StateError(
+                "Cannot unassign job that is running")
+
+        job.schedule_entry = None
+        job.states.append(JobStatus(
+            state=JobStatus.State.UNASSIGNED,
+            sub_state=JobStatus.SubState.CREATED))
+        return job
+
+    # --- socket management ---
 
     def register_socket(self, socket_id: int, client_id: int):
         if socket_id in self._socket_to_client:
@@ -268,22 +292,3 @@ class Server:
         del self._client_to_socket[client_id]
 
         return client_id
-
-    def create_tables(self):
-        Base.metadata.drop_all(self._engine)
-        Base.metadata.create_all(self._engine)
-
-    def request_client_state(self, session: Session,
-                             client: Client, active: bool):
-
-        sid = self._client_to_socket.get(client.id)
-        if sid is None:
-            raise ValueError(f"Client {client.id} not connected)")
-
-        if active:
-            flask_socketio.emit('request_activation',
-                                to=sid, namespace='/client')
-        else:
-            flask_socketio.emit('request_release',
-                                to=sid, namespace='/client')
-

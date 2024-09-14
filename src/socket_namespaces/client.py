@@ -12,16 +12,13 @@ class ClientEventNamespace(Namespace):
         super().__init__('/client')
         self._server = server
 
-    def _drop_claim(self, sid: int) -> bool:
-        client_id = self._server.deregister_socket(sid)
-        if client_id is not None:
-            logging.info(f'Claim on client {client_id} dropped '
-                         f'(socket {request.sid})')
-            self.emit('client-connection-changed',
-                      {'id': client_id, 'connected': False},
-                      namespace='/update')
-            return True
-        return False
+    def _emit_client_update(self, client_id: int, updates: dict):
+
+        self.emit('client-changed',
+                  {'id': client_id, 'updates': updates},
+                  namespace='/update')
+
+    # --- connection event handlers ---
 
     def on_connect(self):
         logging.info(f'Socket with id {request.sid} connected')
@@ -30,16 +27,21 @@ class ClientEventNamespace(Namespace):
         self._drop_claim(request.sid)
         logging.info(f'socket {request.sid} disconnected')
 
+    # --- client claim handlers ---
+
+    def _drop_claim(self, sid: int) -> bool:
+        client_id = self._server.deregister_socket(sid)
+        if client_id is not None:
+            logging.info(f'Claim on client {client_id} dropped '
+                         f'(socket {request.sid})')
+            self._emit_client_update(client_id, {'connected': False})
+            return True
+        return False
+
     def on_drop_claim(self):
         if not self._drop_claim(request.sid):
             logging.warning(f'Unassigned socket {request.sid} tried to drop'
                             ' claim')
-
-    def on_get_clients(self):
-        logging.debug('Getting clients')
-        with self._server.create_session() as session:
-            clients = self._server.get_all_clients(session)
-        self.emit('clients', [{'id': c.id, 'name': c.name} for c in clients])
 
     def on_claim_client(self, client_id: int):
         logging.debug(f'Claiming client {client_id}')
@@ -51,9 +53,7 @@ class ClientEventNamespace(Namespace):
         try:
             self._server.register_socket(request.sid, client_id)
             logging.info(f'Socket {request.sid} claimed client {client_id}')
-            self.emit('client-connection-changed',
-                      {'id': client_id, 'connected': True},
-                      namespace='/update')
+            self._emit_client_update(client_id, {'connected': True})
             with self._server.create_session() as session:
                 client = self._server.get_client(session, client_id)
                 self.emit('claim_successfull',
@@ -64,6 +64,14 @@ class ClientEventNamespace(Namespace):
         except ValueError as e:
             logging.warning(f'Claim failed! {e}')
             self.emit('error', {'message': str(e)})
+
+    # --- client event handlers ---
+
+    def on_get_clients(self):
+        logging.debug('Getting clients')
+        with self._server.create_session() as session:
+            clients = self._server.get_all_clients(session)
+        self.emit('clients', [{'id': c.id, 'name': c.name} for c in clients])
 
     def on_set_state(self, active: bool):
         client_id = self._server.get_client_id(request.sid)
@@ -82,6 +90,7 @@ class ClientEventNamespace(Namespace):
             session.commit()
 
         self.emit('success', {'id': client_id, 'state': target_state})
+        self._emit_client_update(client_id, {'state': target_state})
 
     def on_claim_next_job(self):
         client_id = self._server.get_client_id(request.sid)
