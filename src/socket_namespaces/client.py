@@ -92,6 +92,23 @@ class ClientEventNamespace(Namespace):
         self.emit('success', {'id': client_id, 'state': target_state})
         self._emit_client_update(client_id, {'state': target_state})
 
+    def on_get_active_job(self):
+        client_id = self._server.get_client_id(request.sid)
+        if client_id is None:
+            logging.warning(f'Attempt to get active job on unclaimed socket '
+                            f'{request.sid}')
+            self.emit('error', {'message': 'Socket is not claimed'})
+            return
+
+        logging.debug(f'Client {client_id} requesting active job')
+        with self._server.create_session() as session:
+            job = self._server.get_running_job(session, client_id)
+        if job is None:
+            self.emit('error', {'message': 'No active job'})
+            return
+
+        self.emit('success', {'id': job.id})
+
     def on_claim_next_job(self):
         client_id = self._server.get_client_id(request.sid)
         if client_id is None:
