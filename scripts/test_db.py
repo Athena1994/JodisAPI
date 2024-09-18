@@ -1,10 +1,10 @@
 import json
-from src.server import Server
+from db_context import DBContext
 
 with open('sql_test_cfg.json', 'r') as f:
-    cfg = Server.Config.from_dict(json.load(f))
+    cfg = DBContext.Config.from_dict(json.load(f))
 
-s = Server(cfg)
+s = DBContext(cfg)
 
 s.create_tables()
 s.add_job({'test': 'test'}, 'test_job', 'Test job to assure everything is '

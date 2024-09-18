@@ -1,9 +1,9 @@
 import json
-from server import Server
+from db_context import DBContext
 
 with open('program/server/sql_cfg.json', 'r') as f:
-    cfg = Server.Config.from_dict(json.load(f))
+    cfg = DBContext.Config.from_dict(json.load(f))
 
-s = Server(cfg)
+s = DBContext(cfg)
 
 s.create_tables()
