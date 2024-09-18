@@ -3,20 +3,18 @@ import logging
 from flask import request
 from flask_socketio import Namespace
 
-from server import Server
+from domain_model.client_manager import ClientManager
+from domain_model.exeptions import StateError
+from interface.socket.connection_manager import ConnectionManager
+from utils.db.db_context import DBContext
 
 
 class ClientEventNamespace(Namespace):
 
-    def __init__(self, server: Server):
+    def __init__(self, db: DBContext, cm: ConnectionManager):
         super().__init__('/client')
-        self._server = server
-
-    def _emit_client_update(self, client_id: int, updates: dict):
-
-        self.emit('client-changed',
-                  {'id': client_id, 'updates': updates},
-                  namespace='/update')
+        self._db = db
+        self._cm = cm
 
     # --- connection event handlers ---
 
@@ -30,11 +28,10 @@ class ClientEventNamespace(Namespace):
     # --- client claim handlers ---
 
     def _drop_claim(self, sid: int) -> bool:
-        client_id = self._server.deregister_socket(sid)
+        client_id = self._cm.remove_connection(sid)
         if client_id is not None:
             logging.info(f'Claim on client {client_id} dropped '
                          f'(socket {request.sid})')
-            self._emit_client_update(client_id, {'connected': False})
             return True
         return False
 
@@ -51,15 +48,15 @@ class ClientEventNamespace(Namespace):
             return
 
         try:
-            self._server.register_socket(request.sid, client_id)
+            with self._db.create_session() as session:
+                client = ClientManager(session, client_id).model()
+
+            self._cm.add_connection(request.sid, client_id)
             logging.info(f'Socket {request.sid} claimed client {client_id}')
-            self._emit_client_update(client_id, {'connected': True})
-            with self._server.create_session() as session:
-                client = self._server.get_client(session, client_id)
-                self.emit('claim_successfull',
-                          {'id': client_id,
-                           'name': client.name,
-                           'state': client.state.value})
+            self.emit('claim_successfull',
+                      {'id': client_id,
+                       'name': client.name,
+                       'state': client.state.value})
 
         except ValueError as e:
             logging.warning(f'Claim failed! {e}')
@@ -69,13 +66,15 @@ class ClientEventNamespace(Namespace):
 
     def on_get_clients(self):
         logging.debug('Getting clients')
-        with self._server.create_session() as session:
-            clients = self._server.get_all_clients(session)
+        with self._db.create_session() as session:
+            clients = ClientManager.all(session)
         self.emit('clients', [{'id': c.id, 'name': c.name} for c in clients])
 
     def on_set_state(self, active: bool):
-        client_id = self._server.get_client_id(request.sid)
-        if client_id is None:
+
+        try:
+            client_id = self._cm.get_connection_by_sid(request.sid).client_id()
+        except ConnectionManager.ConnectionError:
             logging.warning(f'Attempt to set state on unclaimed socket '
                             f'{request.sid}')
             self.emit('error', {'message': 'Socket is not claimed'})
@@ -84,25 +83,25 @@ class ClientEventNamespace(Namespace):
         target_state = 'ACTIVE' if active else 'SUSPENDED'
 
         logging.debug(f'Setting state of client {client_id} to {target_state}')
-        with self._server.create_session() as session:
-            client = self._server.get_client(session, client_id)
+        with self._db.create_session() as session:
+            client = ClientManager(session, client_id).model()
             client.state = target_state
             session.commit()
 
         self.emit('success', {'id': client_id, 'state': target_state})
-        self._emit_client_update(client_id, {'state': target_state})
 
     def on_get_active_job(self):
-        client_id = self._server.get_client_id(request.sid)
-        if client_id is None:
-            logging.warning(f'Attempt to get active job on unclaimed socket '
+        try:
+            client_id = self._cm.get_connection_by_sid(request.sid).client_id()
+        except ConnectionManager.ConnectionError:
+            logging.warning(f'Attempt to get active job on  unclaimed socket '
                             f'{request.sid}')
             self.emit('error', {'message': 'Socket is not claimed'})
             return
 
         logging.debug(f'Client {client_id} requesting active job')
-        with self._server.create_session() as session:
-            job = self._server.get_running_job(session, client_id)
+        with self._db.create_session() as session:
+            job = ClientManager(session, client_id).get_active_job()
         if job is None:
             self.emit('error', {'message': 'No active job'})
             return
@@ -110,23 +109,26 @@ class ClientEventNamespace(Namespace):
         self.emit('success', {'id': job.id})
 
     def on_claim_next_job(self):
-        client_id = self._server.get_client_id(request.sid)
-        if client_id is None:
-            logging.warning(f'Attempt to claim job on unclaimed socket '
+        try:
+            client_id = self._cm.get_connection_by_sid(request.sid).client_id()
+        except ConnectionManager.ConnectionError:
+            logging.warning(f'Attempt to claim job on  unclaimed socket '
                             f'{request.sid}')
             self.emit('error', {'message': 'Socket is not claimed'})
             return
 
         logging.debug(f'Client {client_id} claiming next job')
-        with self._server.create_session() as session:
+        with self._db.create_session() as session:
             try:
-                job = self._server.start_next_job(session, client_id)
-            except self._server.StateError as e:
+                job = ClientManager(session, client_id).start_next_job()
+            except StateError as e:
                 logging.warning(f'Failed to claim job: {str(e)}')
                 self.emit('error', {'message': str(e)})
                 return
             if job is None:
                 self.emit('error', {'message': 'No jobs available'})
                 return
+
+            session.commit()
 
             self.emit('job_claimed', {'id': job.id})
