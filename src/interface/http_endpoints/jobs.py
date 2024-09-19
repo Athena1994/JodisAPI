@@ -6,8 +6,8 @@ from injector import inject
 
 from aithena.trading.config_loader import ConfigLoader
 from utils.db.db_context import DBContext
-from domain_model.exeptions import IndexValueError, StateError
-from domain_model.job_manager import JobManager
+from model.db_model.exeptions import IndexValueError, StateError
+from model.db_model.job_manager import JobManager
 from interface.data_objects import JobDO, JobSessionDO
 from utils.http_utils import Param, get_request_parameters
 

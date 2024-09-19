@@ -3,7 +3,7 @@
 import logging
 import flask_socketio
 
-from utils.db.change_notifier import ChangeEmitter
+from utils.observable_model.change_notifier import ChangeEmitter
 
 
 class EmissionSession(ChangeEmitter.Session):

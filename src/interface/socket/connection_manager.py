@@ -3,7 +3,7 @@ import logging
 from interface.socket.connection import Connection
 from typing import Dict
 
-from utils.db.change_notifier import ChangeNotifier
+from utils.observable_model.change_notifier import ChangeNotifier
 
 
 class ConnectionManager:

@@ -1,14 +1,15 @@
 import flask_socketio
 from sqlalchemy.orm import Session
-from db_model import models
-from domain_model.exeptions import StateError
-from domain_model.client_manager import ClientManager
+from model.db_model import models
+from model.db_model.exeptions import StateError
+from model.db_model.client_manager import ClientManager
 
 
 class Connection:
     def __init__(self, sid: int, client_id: int):
         self._sid = sid
         self._client_id = client_id
+        self._
 
     def _emit(self, event: str, *args):
         flask_socketio.emit(event, args, to=self._sid, namespace='/client')

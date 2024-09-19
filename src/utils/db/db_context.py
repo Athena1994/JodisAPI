@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from aithena.utils.config_utils import assert_fields_in_dict
 
-from utils.db.change_notifier import ChangeNotifier
+from utils.observable_model.change_notifier import ChangeNotifier
 
 
 class DBContext:

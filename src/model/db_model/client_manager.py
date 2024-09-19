@@ -3,8 +3,8 @@ from typing import Optional
 from sqlalchemy import and_, func, select, tuple_
 from sqlalchemy.orm import Session
 
-from db_model import models
-from domain_model.exeptions import IndexValueError, StateError
+from model.db_model import models
+from model.db_model.exeptions import IndexValueError, StateError
 
 
 class ClientManager:
@@ -68,8 +68,8 @@ class ClientManager:
             .where(
                 and_(
                     models.Job.id.in_(
-                        select(models.JobScheduleEntry.job_id)
-                        .where(models.JobScheduleEntry.client_id == self._id)),
+                      select(models.JobScheduleEntry.job_id)
+                      .where(models.JobScheduleEntry.client_id == self._id)),
                     models.Job.sub_state == models.Job.SubState.RUNNING
                 )
             )

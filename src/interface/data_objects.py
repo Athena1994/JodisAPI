@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 import enum
 
-from db_model import models
+from model.db_model import models
 
 
 @dataclass

@@ -7,7 +7,7 @@ from flask_injector import inject
 
 from utils.db.db_context import DBContext
 from interface.socket.connection_manager import ConnectionManager
-from domain_model.client_manager import ClientManager
+from model.db_model.client_manager import ClientManager
 from interface.data_objects import ClientDO
 from utils.http_utils import Param, get_request_parameters
 

@@ -2,9 +2,9 @@ import logging
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from db_model import models
-from domain_model.client_manager import ClientManager
-from domain_model.exeptions import StateError
+from model.db_model import models
+from model.db_model.client_manager import ClientManager
+from model.db_model.exeptions import StateError
 from interface.socket.update_events.update_emitter import UpdateEmitter
 
 
@@ -27,8 +27,8 @@ class JobManager:
         logging.info(f"Creating job with name {name}")
 
         job = models.Job(configuration=job_config,
-                         name=name,
-                         description=desc)
+                            name=name,
+                            description=desc)
         session.add(job)
         return job.id
 

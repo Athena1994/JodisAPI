@@ -3,8 +3,8 @@ import logging
 from flask import request
 from flask_socketio import Namespace
 
-from domain_model.client_manager import ClientManager
-from domain_model.exeptions import StateError
+from model.db_model.client_manager import ClientManager
+from model.db_model.exeptions import StateError
 from interface.socket.connection_manager import ConnectionManager
 from utils.db.db_context import DBContext
 

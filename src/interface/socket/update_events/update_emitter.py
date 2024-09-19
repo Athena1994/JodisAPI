@@ -1,10 +1,10 @@
 
-from db_model import models
+from model.db_model import models
 from interface.data_objects import ClientDO, JobDO
 from interface.socket.connection import Connection
 from interface.socket.connection_manager import ConnectionManager
 from interface.socket.update_events.emission_session import EmissionSession
-from utils.db.change_notifier import ChangeEmitter
+from utils.observable_model.change_notifier import ChangeEmitter
 from utils.db.db_context import DBContext
 
 
