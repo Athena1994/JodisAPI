@@ -28,10 +28,20 @@ class ClientDO:
 
 
 @dataclass
+class ClientProgressDO:
+    client_id: int
+    phase: str
+    message: str
+    percentage: float
+    estimated_phase_time: float
+    estimated_epoch_time: float
+    estimated_total_time: float
+
+
+@dataclass
 class JobSessionDO:
     id: int
     job_id: int
-    epoch_ids: list[int]
     max_epoch: int
     snapshot: str
 

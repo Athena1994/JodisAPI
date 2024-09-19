@@ -13,6 +13,7 @@ from interface.socket.namespaces.client import ClientEventNamespace
 from interface.http_endpoints.clients import clients_pb
 from interface.http_endpoints.jobs import jobs_pb
 from interface.socket.namespaces.update import UpdateEventNamespace
+from utils.observable_model.subject_manager import SubjectManager
 
 
 logging.basicConfig(level=logging.DEBUG)
@@ -23,6 +24,7 @@ with open('sql_test_cfg.json', 'r') as f:
     cfg = DBContext.Config.from_dict(json.load(f))
 
 
+sm = SubjectManager()
 db = DBContext(cfg)
 cm = ConnectionManager()
 emitter = UpdateEmitter(db, cm)
@@ -31,6 +33,7 @@ emitter = UpdateEmitter(db, cm)
 def configure(binder):
     binder.bind(DBContext, to=db, scope=singleton)
     binder.bind(ConnectionManager, to=cm, scope=singleton)
+    binder.bind(SubjectManager, to=sm, scope=singleton)
 
 
 app = Flask(__name__)
