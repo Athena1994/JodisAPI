@@ -51,6 +51,9 @@ class Job(Base):
     session: Mapped[Optional["JobSession"]] \
         = relationship(back_populates='job')
 
+    def __repr__(self) -> str:
+        return f"Job({self.id}, {self.name}, {self.state}, {self.SubState})"
+
 
 class JobScheduleEntry(Base):
     __tablename__ = 'JobScheduleEntry'
@@ -65,6 +68,12 @@ class JobScheduleEntry(Base):
 
     job: Mapped["Job"] = relationship(back_populates='schedule_entry')
     client: Mapped["Client"] = relationship(back_populates='schedule')
+
+    def __repr__(self) -> str:
+        return (
+            f"ScheduleEntry(id: {self.id}, "
+            f"cid: {self.client_id}[rank: {self.rank}] -> jid: {self.job_id})"
+        )
 
 
 # --- client --------------------------
@@ -84,6 +93,9 @@ class Client(Base):
         order_by=JobScheduleEntry.rank)
     state: Mapped[State] = mapped_column(
         "State", nullable=False, default=State.SUSPENDED)
+
+    def __repr__(self) -> str:
+        return f"Client (id: {self.id}, {self.name})"
 
 
 # --- session --------------------------

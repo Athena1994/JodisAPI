@@ -1,12 +1,14 @@
 
-import json
 import logging
 
 from flask import Blueprint
 from flask_injector import inject
 
+from interface.utils import bad_request, internal_server_error, ok
+from model.exeptions import IndexValueError
+from interface.services.client_request_service import ClientRequestService
 from utils.db.db_context import DBContext
-from interface.socket.connection_manager import ConnectionManager
+from services.client_connection_service import ClientConnectionService
 from model.db_model.client_manager import ClientManager
 from interface.data_objects import ClientDO
 from utils.http_utils import Param, get_request_parameters
@@ -20,11 +22,8 @@ clients_pb = Blueprint('clients', __name__)
 def register_client(db: DBContext):
     try:
         name,    = get_request_parameters(Param('name', type_=str))
-    except Exception as e:
-        logging.warning(str(e))
-        return json.dumps({
-            'status': 'error',
-            'message': str(e)}), 400
+    except ValueError as e:
+        return bad_request(str(e))
 
     logging.info("Registering client with name {name}")
 
@@ -34,16 +33,11 @@ def register_client(db: DBContext):
             session.commit()
             id = client.id
     except Exception as e:
-        logging.warning(str(e))
-        return json.dumps({
-            'status': 'error',
-            'message': str(e)}), 400
+        return internal_server_error(e)
 
     logging.info(f"Client registered with id {id}")
-    return json.dumps({
-        'status': 'ok',
-        'message': 'Client registered',
-        'id': id})
+
+    return ok('client registered', {'id': id})
 
 
 @clients_pb.route('/client/delete', methods=['POST'])
@@ -51,11 +45,8 @@ def register_client(db: DBContext):
 def delete_client(db: DBContext):
     try:
         client_id, = get_request_parameters(Param('clientId', type_=int))
-    except Exception as e:
-        logging.warning(str(e))
-        return json.dumps({
-            'status': 'error',
-            'message': str(e)}), 400
+    except ValueError as e:
+        return bad_request(str(e))
 
     logging.info(f"Deleting client with id {client_id}")
 
@@ -64,71 +55,48 @@ def delete_client(db: DBContext):
             ClientManager.delete(session, client_id)
             session.commit()
     except Exception as e:
-        logging.warning(str(e))
-        return json.dumps({
-            'status': 'error',
-            'message': str(e)}), 400
+        return internal_server_error(e)
 
-    return json.dumps({
-        'status': 'ok',
-        'message': 'Client deleted'})
+    return ok('Client deleted')
 
 
 @clients_pb.route('/client/request', methods=['POST'])
 @inject
-def server_request(cm: ConnectionManager, db: DBContext):
+def server_request(rs: ClientRequestService, db: DBContext):
     logging.info("Client request received")
     try:
         client_id, cmd, args = get_request_parameters(
             Param('clientId', type_=int),
             Param('cmd', type_=str),
             Param('args', type_=dict))
-    except Exception as e:
-        logging.warning(str(e))
-        return json.dumps({
-            'status': 'error',
-            'message': str(e)}), 400
+    except ValueError as e:
+        return bad_request(str(e))
 
-    if not cm.is_connected(client_id):
-        return json.dumps({
-            'status': 'error',
-            'message': 'Client not connected'}), 400
+    logging.info(f"client_id: {client_id}, request: {cmd}, args: {args}")
 
-    try:
-        connection = cm.get_connection_by_cid(client_id)
-        with db.create_session() as session:
+    with db.create_session() as session:
+        try:
+            client = ClientManager(session, client_id, True)
+        except IndexValueError:
+            return bad_request(f'ClientId {client_id} not found')
 
-            if cmd == 'change_state':
-                connection.request_client_state(args['active'])
-                msg = 'Client state change requested'
-            elif cmd == 'pause_job':
-                connection.request_pause_job(session)
-                msg = 'Job pause requested'
-            elif cmd == 'cancel_job':
-                connection.request_cancel_job(session)
-                msg = 'Job cancel requested'
+        try:
+            rs.handle_request(client, cmd, args)
+            return ok(f'request {cmd} passed on to client {client_id}')
 
-            return json.dumps({
-                'status': 'ok',
-                'message': msg
-            }), 200
-
-    except Exception as e:
-        logging.warning(str(e))
-        return json.dumps({
-            'status': 'error',
-            'message': str(e)}), 400
+        except Exception as e:
+            return internal_server_error(e)
 
 
 @clients_pb.route('/clients', methods=['GET'])
 @inject
-def get_clients(db: DBContext, cm: ConnectionManager):
+def get_clients(db: DBContext, cm: ClientConnectionService):
     with db.create_session() as session:
         return [
             ClientDO(
                 id=c.id,
                 name=c.name,
                 state=c.state.value,
-                connected=cm.is_connected(c.id)
+                connected=True
             ) for c in ClientManager.all(session)
         ], 200

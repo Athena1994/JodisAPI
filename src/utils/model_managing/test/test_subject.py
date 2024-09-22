@@ -1,8 +1,8 @@
 
 import unittest
 
-from src.utils.observable_model.attribute import Attribute
-from src.utils.observable_model.subject import Subject
+from src.utils.model_managing.attribute import Attribute
+from src.utils.model_managing.subject import Subject
 
 
 class SubjectTest(unittest.TestCase):

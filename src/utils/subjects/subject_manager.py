@@ -1,8 +1,8 @@
 
 
-from utils.observable_model.change_notifier import ChangeNotifier
-from utils.observable_model.subject_session import SubjectSession
-from utils.observable_model.subject import Subject
+from utils.model_managing.change_notifier import ChangeNotifier
+from utils.model_managing.subject_session import SubjectSession
+from utils.model_managing.subject import Subject
 
 
 class SubjectManager:
@@ -35,5 +35,5 @@ class SubjectManager:
             raise ValueError('there is already an active session')
         self._active_session = True
         session = SubjectSession(self._subjects)
-        session.on_commit = self.on_commit
+        session.before_commit = self.on_commit
         return session

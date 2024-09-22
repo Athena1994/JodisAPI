@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from aithena.utils.config_utils import assert_fields_in_dict
 
-from utils.observable_model.change_notifier import ChangeNotifier
+from utils.notifier.change_notifier import ChangeNotifier
 
 
 class DBContext:
@@ -57,7 +57,7 @@ class DBContext:
             new = session.new.difference(deleted)
             dirty = session.dirty.difference(deleted)
 
-            with self._notifier.begin_session() as notifier:
+            with self._notifier.create_session() as notifier:
                 for obj in deleted:
                     notifier.notify_delete(obj)
 

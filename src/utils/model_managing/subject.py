@@ -1,6 +1,6 @@
 
 
-from src.utils.observable_model.attribute import Attribute
+from src.utils.model_managing.attribute import Attribute
 
 
 class Subject:

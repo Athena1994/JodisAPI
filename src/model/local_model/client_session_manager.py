@@ -1,7 +1,7 @@
 
 
 from model.local_model import models
-from utils.observable_model.subject_session import SubjectSession
+from utils.model_managing.subject_session import SubjectSession
 
 
 class ClientSessionManager:
@@ -21,5 +21,3 @@ class ClientSessionManager:
     def delete(session: SubjectSession, client_id: int) -> None:
         s = ClientSessionManager(session, client_id).model()
         session.delete(s)
-
-

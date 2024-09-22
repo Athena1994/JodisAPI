@@ -6,14 +6,15 @@ from flask_injector import FlaskInjector, singleton
 from flask_socketio import SocketIO
 
 
-from interface.socket.update_events.update_emitter import UpdateEmitter
+from interface.services.client_request_service import ClientRequestService
+from interface.services.update_event_service import UpdateEventService
+from interface.socket_namespaces.client import ClientEventNamespace
+from interface.socket_namespaces.update import UpdateEventNamespace
 from utils.db.db_context import DBContext
-from interface.socket.connection_manager import ConnectionManager
-from interface.socket.namespaces.client import ClientEventNamespace
+from services.client_connection_service import ClientConnectionService
 from interface.http_endpoints.clients import clients_pb
 from interface.http_endpoints.jobs import jobs_pb
-from interface.socket.namespaces.update import UpdateEventNamespace
-from utils.observable_model.subject_manager import SubjectManager
+from utils.model_managing.subject_manager import SubjectManager
 
 
 logging.basicConfig(level=logging.DEBUG)
@@ -26,13 +27,16 @@ with open('sql_test_cfg.json', 'r') as f:
 
 sm = SubjectManager()
 db = DBContext(cfg)
-cm = ConnectionManager()
-emitter = UpdateEmitter(db, cm)
+
+ues = UpdateEventService(db, sm)
+ccs = ClientConnectionService()
+crs = ClientRequestService(ccs)
 
 
 def configure(binder):
     binder.bind(DBContext, to=db, scope=singleton)
-    binder.bind(ConnectionManager, to=cm, scope=singleton)
+    binder.bind(ClientConnectionService, to=ccs, scope=singleton)
+    binder.bind(ClientRequestService, to=crs, scope=singleton)
     binder.bind(SubjectManager, to=sm, scope=singleton)
 
 
@@ -44,7 +48,7 @@ app.register_blueprint(jobs_pb)
 CORS(app, resources={r"/*": {"origins": "*"}}, automatic_options=True)
 
 socketio = SocketIO(app, cors_allowed_origins="*")
-socketio.on_namespace(ClientEventNamespace(db, cm))
+socketio.on_namespace(ClientEventNamespace(db, ccs))
 socketio.on_namespace(UpdateEventNamespace())
 
 

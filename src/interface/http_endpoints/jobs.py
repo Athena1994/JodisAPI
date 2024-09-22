@@ -5,8 +5,9 @@ from flask import Blueprint, request
 from injector import inject
 
 from aithena.trading.config_loader import ConfigLoader
+from interface.utils import bad_request, internal_server_error, not_found, ok
 from utils.db.db_context import DBContext
-from model.db_model.exeptions import IndexValueError, StateError
+from model.exeptions import IndexValueError, StateError
 from model.db_model.job_manager import JobManager
 from interface.data_objects import JobDO, JobSessionDO
 from utils.http_utils import Param, get_request_parameters
@@ -27,9 +28,9 @@ def get_jobs(db: DBContext):
 def validate_config():
     try:
         ConfigLoader(request.json)
-        return {'valid': True}
+        return ok(data={'valid': True})
     except ValueError as e:
-        return {'valid': False, 'message': str(e)}
+        return ok(str(e), {'valid': False})
 
 
 @jobs_pb.route('/jobs/delete', methods=['POST'])
@@ -41,8 +42,7 @@ def delete_jobs(server: DBContext):
             Param('ids', collection=True, type_=int),
             Param('force', flag=True))
     except ValueError as e:
-        logging.warning(str(e))
-        return {'error': str(e)}, 400
+        return bad_request(str(e))
 
     deleted_ids = []
     with server.create_session() as session:
@@ -54,7 +54,7 @@ def delete_jobs(server: DBContext):
                 logging.error(f'Failed to delete job {id}: {str(e)}')
         session.commit()
 
-    return {'deletedIds': deleted_ids}, 200
+    return ok('Jobs deleted', {'deletedIds': deleted_ids})
 
 
 @jobs_pb.route('/job', methods=['POST'])
@@ -66,19 +66,20 @@ def create_job(db: DBContext):
             Param('config', type_=dict),
             Param('description', type_=str))
     except ValueError as e:
-        logging.warning(str(e))
-        return {'error': str(e)}, 400
+        return bad_request(str(e))
 
     try:
         ConfigLoader(request.json['config'])
     except ValueError as e:
-        logging.warning('Provided config is invalid')
-        return {'error': f"Invalid config: {str(e)}"}, 400
+        return bad_request(f'Provided config is invalid ({e})')
+    except Exception as e:
+        return internal_server_error(e)
 
     with db.create_session() as session:
         JobManager.create(session, config, name, description)
         session.commit()
-        return {'status': 'ok'}, 200
+
+    return ok('Job created')
 
 
 @jobs_pb.route('/jobs/assign', methods=['POST'])
@@ -91,8 +92,7 @@ def assign_jobs(db: DBContext):
             Param('clientId', type_=int)
         )
     except ValueError as e:
-        logging.warning(str(e))
-        return {'error': str(e)}, 400
+        return bad_request(str(e))
 
     with db.create_session() as session:
         for id in job_ids:
@@ -101,12 +101,11 @@ def assign_jobs(db: DBContext):
             except StateError or IndexValueError as e:
                 logging.warning(f'Failed to assign job {id}: {str(e)}')
             except Exception as e:
-                logging.error(f'Failed to assign job {id}: {str(e)}')
-                raise e
+                return internal_server_error(e)
 
         session.commit()
 
-    return {'status': 'ok'}, 200
+    return ok()
 
 
 @jobs_pb.route('/jobs/unassign', methods=['POST'])
@@ -118,8 +117,7 @@ def unassign_jobs(db: DBContext):
             Param('jobIds', collection=True, type_=int),
             Param('force', flag=True))
     except ValueError as e:
-        logging.warning(str(e))
-        return {'error': str(e)}, 400
+        return bad_request(str(e))
 
     logging.info(f'Unassigning jobs {job_ids} (force={force})')
 
@@ -130,24 +128,26 @@ def unassign_jobs(db: DBContext):
             except StateError or IndexValueError as e:
                 logging.warning(f'Failed to unassign job {job_id}: {str(e)}')
             except Exception as e:
-                logging.error(f'Failed to unassign job {job_id}: {str(e)}')
-                raise e
+                return internal_server_error(e)
 
         session.commit()
 
-    return {'status': 'ok'}, 200
+    return ok()
 
 
 @jobs_pb.route('/job/session', methods=['GET'])
 @inject
 def get_job_session(db: DBContext):
 
-    job_id = get_request_parameters(Param('jobId', type_=int))
+    try:
+        job_id, = get_request_parameters(Param('jobId', type_=int))
+    except ValueError as e:
+        return bad_request(str(e))
 
     with db.create_session() as session:
         job = JobManager(session, job_id).model()
 
         if job.session is None:
-            return {'error': 'Job has no session'}, 404
+            return not_found('specified job has not session')
 
         return JobSessionDO.from_db(job.session), 200

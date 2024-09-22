@@ -2,9 +2,9 @@
 
 import unittest
 
-from src.utils.observable_model.attribute import Attribute
-from src.utils.observable_model.subject_session import SubjectSession
-from src.utils.observable_model.subject import Subject
+from src.utils.model_managing.attribute import Attribute
+from src.utils.model_managing.subject_session import SubjectSession
+from src.utils.model_managing.subject import Subject
 
 
 class DummySubject(Subject):
@@ -129,7 +129,7 @@ class SessionTest(unittest.TestCase):
 
         # assert context manager without commit rolls back changes
         with SubjectSession(subjects) as session:
-            session.on_commit = on_commit
+            session.before_commit = on_commit
             a.a = -1
             session.delete(b)
             session.add(f)
@@ -141,7 +141,7 @@ class SessionTest(unittest.TestCase):
 
         # assert context manager with commit flushes changes
         with SubjectSession(subjects) as session:
-            session.on_commit = on_commit
+            session.before_commit = on_commit
             a.a = -1
             session.delete(b)
             session.add(f)

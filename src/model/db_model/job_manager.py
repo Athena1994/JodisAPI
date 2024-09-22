@@ -4,8 +4,7 @@ from sqlalchemy.orm import Session
 
 from model.db_model import models
 from model.db_model.client_manager import ClientManager
-from model.db_model.exeptions import StateError
-from interface.socket.update_events.update_emitter import UpdateEmitter
+from model.exeptions import StateError
 
 
 class JobManager:
@@ -27,8 +26,8 @@ class JobManager:
         logging.info(f"Creating job with name {name}")
 
         job = models.Job(configuration=job_config,
-                            name=name,
-                            description=desc)
+                         name=name,
+                         description=desc)
         session.add(job)
         return job.id
 
@@ -42,8 +41,6 @@ class JobManager:
             raise StateError("Active jobs cannot be deleted.")
 
         session.delete(job)
-
-        UpdateEmitter.emit_delete_event('job', id)
 
     @staticmethod
     def all(session: Session) -> list[models.Job]:
@@ -80,6 +77,6 @@ class JobManager:
         if job.sub_state == job.SubState.RUNNING and not force:
             raise StateError("Cannot unassign active job!")
 
-        job.schedule_entry = None
+        self._session.delete(job.schedule_entry)
         job.state = job.State.UNASSIGNED
         job.sub_state = job.SubState.CREATED

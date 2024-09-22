@@ -2,8 +2,8 @@
 
 import enum
 
-from utils.observable_model.attribute import Attribute
-from utils.observable_model.subject import Subject
+from utils.model_managing.attribute import Attribute
+from utils.model_managing.subject import Subject
 
 
 class ClientSession(Subject):

@@ -4,17 +4,17 @@ from flask import request
 from flask_socketio import Namespace
 
 from model.db_model.client_manager import ClientManager
-from model.db_model.exeptions import StateError
-from interface.socket.connection_manager import ConnectionManager
+from model.exeptions import StateError
+from services.client_connection_service import ClientConnectionService, NotConnectedError
 from utils.db.db_context import DBContext
 
 
 class ClientEventNamespace(Namespace):
 
-    def __init__(self, db: DBContext, cm: ConnectionManager):
+    def __init__(self, db: DBContext, ccs: ClientConnectionService):
         super().__init__('/client')
         self._db = db
-        self._cm = cm
+        self._ccs = ccs
 
     # --- connection event handlers ---
 
@@ -28,7 +28,7 @@ class ClientEventNamespace(Namespace):
     # --- client claim handlers ---
 
     def _drop_claim(self, sid: int) -> bool:
-        client_id = self._cm.remove_connection(sid)
+        client_id = self._ccs.remove_by_sid(sid)
         if client_id is not None:
             logging.info(f'Claim on client {client_id} dropped '
                          f'(socket {request.sid})')
@@ -51,7 +51,7 @@ class ClientEventNamespace(Namespace):
             with self._db.create_session() as session:
                 client = ClientManager(session, client_id).model()
 
-            self._cm.add_connection(request.sid, client_id)
+            self._ccs.add(request.sid, client_id)
             logging.info(f'Socket {request.sid} claimed client {client_id}')
             self.emit('claim_successfull',
                       {'id': client_id,
@@ -68,13 +68,14 @@ class ClientEventNamespace(Namespace):
         logging.debug('Getting clients')
         with self._db.create_session() as session:
             clients = ClientManager.all(session)
-        self.emit('clients', [{'id': c.id, 'name': c.name} for c in clients])
+            self.emit('clients',
+                      [{'id': c.id, 'name': c.name} for c in clients])
 
     def on_set_state(self, active: bool):
 
         try:
-            client_id = self._cm.get_connection_by_sid(request.sid).client_id()
-        except ConnectionManager.ConnectionError:
+            client_id = self._ccs.get_cid(request.sid)
+        except NotConnectedError:
             logging.warning(f'Attempt to set state on unclaimed socket '
                             f'{request.sid}')
             self.emit('error', {'message': 'Socket is not claimed'})
@@ -92,8 +93,8 @@ class ClientEventNamespace(Namespace):
 
     def on_get_active_job(self):
         try:
-            client_id = self._cm.get_connection_by_sid(request.sid).client_id()
-        except ConnectionManager.ConnectionError:
+            client_id = self._ccs.get_cid(request.sid)
+        except NotConnectedError:
             logging.warning(f'Attempt to get active job on  unclaimed socket '
                             f'{request.sid}')
             self.emit('error', {'message': 'Socket is not claimed'})
@@ -110,8 +111,8 @@ class ClientEventNamespace(Namespace):
 
     def on_claim_next_job(self):
         try:
-            client_id = self._cm.get_connection_by_sid(request.sid).client_id()
-        except ConnectionManager.ConnectionError:
+            client_id = self._ccs.get_cid(request.sid)
+        except NotConnectedError:
             logging.warning(f'Attempt to claim job on  unclaimed socket '
                             f'{request.sid}')
             self.emit('error', {'message': 'Socket is not claimed'})

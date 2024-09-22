@@ -4,7 +4,7 @@ from sqlalchemy import and_, func, select, tuple_
 from sqlalchemy.orm import Session
 
 from model.db_model import models
-from model.db_model.exeptions import IndexValueError, StateError
+from model.exeptions import IndexValueError, StateError
 
 
 class ClientManager:
@@ -55,7 +55,7 @@ class ClientManager:
 
         return self._model
 
-    def get_id(self) -> int:
+    def id(self) -> int:
         return self._id
 
     def is_in_state(self, state: models.Client.State) -> bool:

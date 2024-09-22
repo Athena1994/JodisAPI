@@ -1,10 +1,11 @@
 
 
 from dataclasses import dataclass
-from src.utils.observable_model.subject import Subject
+from src.utils.model_managing.subject import Subject
+from utils.session.flushable_session import FlushableSession
 
 
-class SubjectSession:
+class SubjectSession(FlushableSession):
 
     @dataclass
     class Change:
@@ -12,6 +13,7 @@ class SubjectSession:
         new: object
 
     def __init__(self, subjects: set[Subject]):
+        super().__init__(commit_on_exit=False)
         self._subjects = subjects
 
         for s in self._subjects:
@@ -97,30 +99,13 @@ class SubjectSession:
         else:
             change_dict[name] = SubjectSession.Change(old_value, new_value)
 
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.close()
-
     def _clear(self):
         self._new.clear()
         self._dirty.clear()
         self._deleted.clear()
         self._changes.clear()
 
-    def on_commit(self,
-                  session: 'SubjectSession',
-                  new: set[Subject],
-                  dirty: set[Subject],
-                  deleted: set[Subject]):
-        pass
-
-    def commit(self):
-        self.on_commit(self, self._new, self._dirty, self._deleted)
-        self._clear()
-
-    def rollback(self):
+    def _rollback(self):
         for subject, changes in self._changes.items():
             for att, change in changes.items():
                 subject.__dict__[att] = change.old
@@ -135,7 +120,17 @@ class SubjectSession:
 
         self._clear()
 
-    def close(self):
-        self.rollback()
+    def _close(self, commit: bool):
+        super()._close(commit)
         for s in self._subjects:
             self.detach(s)
+
+    def _flush(self):
+        self.on_flush(self, self._new, self._dirty, self._deleted)
+
+    def on_flush(self,
+                 session: 'SubjectSession',
+                 new: set[Subject],
+                 dirty: set[Subject],
+                 deleted: set[Subject]):
+        pass
