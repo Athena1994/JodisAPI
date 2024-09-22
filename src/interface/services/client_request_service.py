@@ -3,7 +3,7 @@
 from model.db_model import models as db_model
 from model.db_model.client_manager import ClientManager
 from model.exeptions import StateError
-from services.client_connection_service import ClientConnectionService
+from interface.services.client_connection_service import ClientConnectionService
 
 
 class ClientRequestService:

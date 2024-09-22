@@ -35,5 +35,5 @@ class SubjectManager:
             raise ValueError('there is already an active session')
         self._active_session = True
         session = SubjectSession(self._subjects)
-        session.before_commit = self.on_commit
+        session.on_flush = self.on_commit
         return session

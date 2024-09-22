@@ -4,11 +4,12 @@ import logging
 from flask import Blueprint
 from flask_injector import inject
 
-from interface.utils import bad_request, internal_server_error, ok
+from interface.http_endpoints.http_utils\
+      import bad_request, internal_server_error, ok
 from model.exeptions import IndexValueError
 from interface.services.client_request_service import ClientRequestService
 from utils.db.db_context import DBContext
-from services.client_connection_service import ClientConnectionService
+from interface.services.client_connection_service import ClientConnectionService
 from model.db_model.client_manager import ClientManager
 from interface.data_objects import ClientDO
 from utils.http_utils import Param, get_request_parameters
@@ -90,13 +91,13 @@ def server_request(rs: ClientRequestService, db: DBContext):
 
 @clients_pb.route('/clients', methods=['GET'])
 @inject
-def get_clients(db: DBContext, cm: ClientConnectionService):
+def get_clients(db: DBContext, ccs: ClientConnectionService):
     with db.create_session() as session:
         return [
             ClientDO(
                 id=c.id,
                 name=c.name,
                 state=c.state.value,
-                connected=True
+                connected=ccs.is_connected(c.id)
             ) for c in ClientManager.all(session)
         ], 200

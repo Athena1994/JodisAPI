@@ -11,7 +11,7 @@ from interface.services.update_event_service import UpdateEventService
 from interface.socket_namespaces.client import ClientEventNamespace
 from interface.socket_namespaces.update import UpdateEventNamespace
 from utils.db.db_context import DBContext
-from services.client_connection_service import ClientConnectionService
+from interface.services.client_connection_service import ClientConnectionService
 from interface.http_endpoints.clients import clients_pb
 from interface.http_endpoints.jobs import jobs_pb
 from utils.model_managing.subject_manager import SubjectManager
@@ -29,7 +29,7 @@ sm = SubjectManager()
 db = DBContext(cfg)
 
 ues = UpdateEventService(db, sm)
-ccs = ClientConnectionService()
+ccs = ClientConnectionService(sm)
 crs = ClientRequestService(ccs)
 
 

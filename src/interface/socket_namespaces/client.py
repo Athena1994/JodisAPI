@@ -5,8 +5,10 @@ from flask_socketio import Namespace
 
 from model.db_model.client_manager import ClientManager
 from model.exeptions import StateError
-from services.client_connection_service import ClientConnectionService, NotConnectedError
+from interface.services.client_connection_service \
+    import ClientConnectionService, NotConnectedError
 from utils.db.db_context import DBContext
+from interface.socket_namespaces.socket_utils import error, success
 
 
 class ClientEventNamespace(Namespace):
@@ -43,24 +45,23 @@ class ClientEventNamespace(Namespace):
     def on_claim_client(self, client_id: int):
         logging.debug(f'Claiming client {client_id}')
         if not isinstance(client_id, int):
-            self.emit('error', {'message': 'Client id must be an integer'})
-            logging.warning('Claim attempt with non-integer client id')
-            return
+            return error(self, 'Client id must be an integer')
 
         try:
             with self._db.create_session() as session:
                 client = ClientManager(session, client_id).model()
 
             self._ccs.add(request.sid, client_id)
-            logging.info(f'Socket {request.sid} claimed client {client_id}')
-            self.emit('claim_successfull',
-                      {'id': client_id,
-                       'name': client.name,
-                       'state': client.state.value})
+            success(
+                self, 'claim_successfull', {
+                    'id': client_id,
+                    'name': client.name,
+                    'state': client.state.value
+                }, f"Socket {request.sid} claimed client {client_id}"
+            )
 
         except ValueError as e:
-            logging.warning(f'Claim failed! {e}')
-            self.emit('error', {'message': str(e)})
+            error(self, f'Claim failed! {e}')
 
     # --- client event handlers ---
 
@@ -76,60 +77,54 @@ class ClientEventNamespace(Namespace):
         try:
             client_id = self._ccs.get_cid(request.sid)
         except NotConnectedError:
-            logging.warning(f'Attempt to set state on unclaimed socket '
-                            f'{request.sid}')
-            self.emit('error', {'message': 'Socket is not claimed'})
-            return
+            return error(self, 'Socket is not claimed')
 
         target_state = 'ACTIVE' if active else 'SUSPENDED'
 
         logging.debug(f'Setting state of client {client_id} to {target_state}')
-        with self._db.create_session() as session:
-            client = ClientManager(session, client_id).model()
-            client.state = target_state
-            session.commit()
 
-        self.emit('success', {'id': client_id, 'state': target_state})
+        try:
+            with self._db.create_session() as session:
+                client = ClientManager(session, client_id).model()
+                client.state = target_state
+                session.commit()
+            success(self, data={'id': client_id, 'state': target_state})
+        except Exception as e:
+            error(self, str(e))
 
     def on_get_active_job(self):
         try:
             client_id = self._ccs.get_cid(request.sid)
         except NotConnectedError:
-            logging.warning(f'Attempt to get active job on  unclaimed socket '
-                            f'{request.sid}')
-            self.emit('error', {'message': 'Socket is not claimed'})
-            return
+            return error(self, 'socket not claimed')
 
         logging.debug(f'Client {client_id} requesting active job')
-        with self._db.create_session() as session:
-            job = ClientManager(session, client_id).get_active_job()
-        if job is None:
-            self.emit('error', {'message': 'No active job'})
-            return
-
-        self.emit('success', {'id': job.id})
+        try:
+            with self._db.create_session() as session:
+                job = ClientManager(session, client_id).get_active_job()
+            if job is None:
+                return error(self, 'No active job')
+            success(self, data={'id': job.id})
+        except Exception as e:
+            error(self, str(e))
 
     def on_claim_next_job(self):
         try:
             client_id = self._ccs.get_cid(request.sid)
         except NotConnectedError:
-            logging.warning(f'Attempt to claim job on  unclaimed socket '
-                            f'{request.sid}')
-            self.emit('error', {'message': 'Socket is not claimed'})
-            return
+            return error(self, 'socket is not claimed')
 
         logging.debug(f'Client {client_id} claiming next job')
-        with self._db.create_session() as session:
-            try:
+
+        try:
+            with self._db.create_session() as session:
                 job = ClientManager(session, client_id).start_next_job()
-            except StateError as e:
-                logging.warning(f'Failed to claim job: {str(e)}')
-                self.emit('error', {'message': str(e)})
-                return
-            if job is None:
-                self.emit('error', {'message': 'No jobs available'})
-                return
+                if job is None:
+                    return error(self, "No jobs, available!")
 
-            session.commit()
+                session.commit()
 
-            self.emit('job_claimed', {'id': job.id})
+                success(self, 'job_claimed', {'id': job.id})
+
+        except StateError as e:
+            return error(self, {str(e)})

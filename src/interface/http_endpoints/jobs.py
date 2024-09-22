@@ -5,7 +5,8 @@ from flask import Blueprint, request
 from injector import inject
 
 from aithena.trading.config_loader import ConfigLoader
-from interface.utils import bad_request, internal_server_error, not_found, ok
+from interface.http_endpoints.http_utils \
+      import bad_request, internal_server_error, not_found, ok
 from utils.db.db_context import DBContext
 from model.exeptions import IndexValueError, StateError
 from model.db_model.job_manager import JobManager

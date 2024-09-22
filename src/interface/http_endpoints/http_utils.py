@@ -30,5 +30,9 @@ def not_found(msg: str) -> Tuple[dict, int]:
 
 def ok(msg: str = None, data: dict = {}) -> Tuple[dict, int]:
     logging.info(f'ok ({msg})')
-    response = {'status': 'ok'} | data | ({} if msg is None else {'message': msg})
+    response = (
+        {'status': 'ok'}
+        | data
+        | ({} if msg is None else {'message': msg})
+    )
     return json.dumps(response), 200

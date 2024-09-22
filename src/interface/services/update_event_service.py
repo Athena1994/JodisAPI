@@ -3,6 +3,7 @@
 import logging
 import flask_socketio
 from interface.data_objects import ClientDO, JobDO
+from interface.services.client_connection_service import ClientConnectionService
 import model.db_model.models as db_model
 import model.local_model.models as local_model
 
@@ -41,7 +42,8 @@ class UpdateEventService:
                     'updates': updates
                 } for id, updates in entity_updates.items()])
 
-    def __init__(self, db: DBContext, sm: SubjectManager):
+    def __init__(self,
+                 db: DBContext, sm: SubjectManager):
         self._sm = sm
         self._db = db
 
@@ -57,6 +59,8 @@ class UpdateEventService:
 
         sm_notifier = sm.get_notifier()
         sm_notifier.set_context_factory(lambda: UpdateEventService.EventStage())
+        sm_notifier.add_listener(str(local_model.ClientSession),
+                                 self.on_client_session_event)
 
     def on_client_event(self,
                         context: EventStage,
@@ -64,24 +68,25 @@ class UpdateEventService:
         client: db_model.Client = obj
 
         if event == 'add':
-            context.stage_add('client', ClientDO.create(client, True))
+            context.stage_add('client', ClientDO.create(client, False))
         elif event == 'delete':
             context.stage_delete('client', client.id)
         elif event == 'update':
             context.stage_update(
                 'client', client.id, ClientDO.filter_updates(data))
 
-    # def on_connection_event(self,
-    #                         session: EmissionSession,
-    #                         event: str, obj: object, data: dict):
-    #     connection: Connection = obj
+    def on_client_session_event(self,
+                                context: EventStage,
+                                event: str, obj: object, data: dict):
 
-    #     if event == 'add':
-    #         session.stage_update('client', connection.client_id(),
-    #                              {'connected': True})
-    #     elif event == 'delete':
-    #         session.stage_update('client', connection.client_id(),
-    #                              {'connected': False})
+        client_session: local_model.ClientSession = obj
+
+        if event == 'add':
+            context.stage_update('client', client_session.client_id,
+                                 {'connected': True})
+        elif event == 'delete':
+            context.stage_update('client', client_session.client_id,
+                                 {'connected': False})
 
     def on_job_event(self,
                      context: EventStage,

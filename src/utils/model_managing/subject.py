@@ -1,6 +1,6 @@
 
 
-from src.utils.model_managing.attribute import Attribute
+from utils.model_managing.attribute import Attribute
 
 
 class Subject:
@@ -16,7 +16,8 @@ class Subject:
         primary_key = [v._name for v in self._attributes_dict.values()
                        if v._primary_key]
         if len(primary_key) != 1:
-            raise ValueError('Subject must have exactly one primary key!')
+            raise ValueError('Subject must have exactly one primary key! '
+                             f'(found {len(primary_key)})')
 
         self._primary_key = primary_key[0]
 

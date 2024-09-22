@@ -17,6 +17,6 @@ class ClientSession(Subject):
     phase = Attribute('phase', Phase, Phase.PREPARATION)
     ix = Attribute('ix', int, 0)
     count = Attribute('count', int, -1)
-    time_per_ix = Attribute('time_per_ix', float, 0)
+    time_per_ix = Attribute('time_per_ix', float, 0.)
     message = Attribute('message', str, '')
-    estimated_times = Attribute('estimated_times', dict, 0)
+    estimated_times = Attribute('estimated_times', dict, {})
