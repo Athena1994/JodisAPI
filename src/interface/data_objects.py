@@ -3,7 +3,8 @@
 from dataclasses import dataclass
 import enum
 
-from model.db_model import models
+import model.db_model.models as db_model
+import model.local_model.models as local_model
 
 
 @dataclass
@@ -14,7 +15,7 @@ class ClientDO:
     state: str
 
     @staticmethod
-    def create(client: models.Client, is_connected: bool):
+    def create(client: db_model.Client, is_connected: bool):
         return ClientDO(client.id,
                         client.name,
                         is_connected,
@@ -23,7 +24,7 @@ class ClientDO:
     @staticmethod
     def filter_updates(updates: dict):
         updates = {k: updates[k] for k in updates
-                   if k in ['name', 'state']}
+                   if k in ['name', 'state', 'connected']}
         return updates
 
 
@@ -32,10 +33,33 @@ class ClientProgressDO:
     client_id: int
     phase: str
     message: str
-    percentage: float
+    percentage_done: float
     estimated_phase_time: float
     estimated_epoch_time: float
     estimated_total_time: float
+
+    @staticmethod
+    def create(client_session: local_model.ClientSession):
+        prog = ClientProgressDO.calc_progress(client_session)
+
+        return ClientProgressDO(
+            client_id=client_session.client_id,
+            phase=client_session.phase.value,
+            message=client_session.message,
+            percentage_done=prog['percentage'],
+            estimated_phase_time=prog['estimated_phase_time'],
+            estimated_epoch_time=-1,
+            estimated_total_time=-1)
+
+    @staticmethod
+    def calc_progress(cs: local_model.ClientSession):
+        if cs.phase_count == -1:
+            return {'percentage': -1, 'estimated_phase_time': -1}
+
+        percentage = cs.phase_ix / cs.phase_count
+        estimated_phase_time = (cs.phase_count - cs.phase_ix) * cs.time_per_ix
+        return {'percentage': percentage,
+                'estimated_phase_time': estimated_phase_time}
 
 
 @dataclass
@@ -46,7 +70,7 @@ class JobSessionDO:
     snapshot: str
 
     @staticmethod
-    def from_db(session: models.JobSession):
+    def from_db(session: db_model.JobSession):
         return JobSessionDO(id=session.id,
                             job_id=session.job_id,
                             epoch_ids=[e.id for e in session.epochs],
@@ -66,7 +90,7 @@ class JobDO:
     description: str
 
     @staticmethod
-    def from_db(job: models.Job):
+    def from_db(job: db_model.Job):
         client_id = (
             job.schedule_entry.client_id
             if job.schedule_entry is not None else -1

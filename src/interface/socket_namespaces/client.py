@@ -7,16 +7,23 @@ from model.db_model.client_manager import ClientManager
 from model.exeptions import StateError
 from interface.services.client_connection_service \
     import ClientConnectionService, NotConnectedError
+from model.local_model.client_session_manager import ClientSessionManager
+from model.local_model.models import ClientSession
 from utils.db.db_context import DBContext
 from interface.socket_namespaces.socket_utils import error, success
+from utils.model_managing.subject_manager import SubjectManager
 
 
 class ClientEventNamespace(Namespace):
 
-    def __init__(self, db: DBContext, ccs: ClientConnectionService):
+    def __init__(self,
+                 db: DBContext,
+                 sm: SubjectManager,
+                 ccs: ClientConnectionService):
         super().__init__('/client')
         self._db = db
         self._ccs = ccs
+        self._sm = sm
 
     # --- connection event handlers ---
 
@@ -128,3 +135,59 @@ class ClientEventNamespace(Namespace):
 
         except StateError as e:
             return error(self, {str(e)})
+
+    def on_set_phase(self, phase: str, count: int):
+        try:
+            client_id = self._ccs.get_cid(request.sid)
+        except NotConnectedError:
+            return error(self, 'socket is not claimed')
+
+        try:
+            phase = ClientSession.Phase[phase]
+        except KeyError:
+            return error(self, 'Invalid phase! allowed values are: '
+                               f'{ClientSession.Phase.__members__.keys()}')
+
+        count = int(count)
+
+        logging.debug(f'Client {client_id} setting phase to {phase} '
+                      f'(cnt: {count})')
+
+        try:
+            with self._sm.create_session() as session:
+                cs = ClientSessionManager(session, client_id)
+                cs.change_phase(phase, count)
+                session.commit()
+            success(self)
+        except Exception as e:
+            error(self, str(e))
+
+    def on_update_phase(self, ix: int, time_per_ix: float):
+        try:
+            client_id = self._ccs.get_cid(request.sid)
+        except NotConnectedError:
+            return error(self, 'socket is not claimed')
+
+        try:
+            with self._sm.create_session() as session:
+                cs = ClientSessionManager(session, client_id)
+                cs.update_phase(ix, time_per_ix)
+                session.commit()
+            success(self)
+        except Exception as e:
+            error(self, str(e))
+
+    def on_set_message(self, message: str):
+        try:
+            client_id = self._ccs.get_cid(request.sid)
+        except NotConnectedError:
+            return error(self, 'socket is not claimed')
+
+        try:
+            with self._sm.create_session() as session:
+                cs = ClientSessionManager(session, client_id)
+                cs.change_message(message)
+                session.commit()
+            success(self)
+        except Exception as e:
+            error(self, str(e))

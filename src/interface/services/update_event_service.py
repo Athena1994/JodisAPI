@@ -2,7 +2,7 @@
 
 import logging
 import flask_socketio
-from interface.data_objects import ClientDO, JobDO
+from interface.data_objects import ClientDO, ClientProgressDO, JobDO
 from interface.services.client_connection_service import ClientConnectionService
 import model.db_model.models as db_model
 import model.local_model.models as local_model
@@ -84,9 +84,19 @@ class UpdateEventService:
         if event == 'add':
             context.stage_update('client', client_session.client_id,
                                  {'connected': True})
+            context.stage_add('client_progress',
+                              ClientProgressDO.create(client_session))
+
         elif event == 'delete':
             context.stage_update('client', client_session.client_id,
                                  {'connected': False})
+            context.stage_delete('client_progress', client_session.client_id)
+
+        elif event == 'update':
+            context.stage_update(
+                'client_progress',
+                client_session.client_id,
+                ClientProgressDO.create(client_session).__dict__)
 
     def on_job_event(self,
                      context: EventStage,

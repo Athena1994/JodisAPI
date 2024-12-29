@@ -1,6 +1,7 @@
 
 
 from dataclasses import dataclass
+import threading
 from src.utils.model_managing.subject import Subject
 from utils.session.flushable_session import FlushableSession
 
@@ -12,12 +13,14 @@ class SubjectSession(FlushableSession):
         old: object
         new: object
 
-    def __init__(self, subjects: set[Subject]):
+    def __init__(self,
+                 subjects: set[Subject],
+                 lock: threading.Lock):
         super().__init__(commit_on_exit=False)
-        self._subjects = subjects
 
-        for s in self._subjects:
-            self.attach(s)
+        self._lock = lock
+
+        self._subjects = subjects
 
         self._new: set[Subject] = set()
         self._dirty: set[Subject] = set()
@@ -25,8 +28,23 @@ class SubjectSession(FlushableSession):
 
         self._changes: dict[Subject, dict[str, SubjectSession.Change]] = dict()
 
+    def __enter__(self):
+        self._lock.acquire()
+
+        for s in self._subjects:
+            self.attach(s)
+
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        super().__exit__(exc_type, exc_val, exc_tb)
+        self._lock.release()
+
     def get_changes(self, subject: Subject):
         return self._changes.get(subject, {})
+
+    def get_all(self, type_: type) -> set[Subject]:
+        return {s for s in self._subjects if isinstance(s, type_)}
 
     def get(self, type_: type, key: object, raise_: bool) -> Subject:
         for s in self._subjects:
@@ -37,6 +55,9 @@ class SubjectSession(FlushableSession):
             raise IndexError('Subject not found')
 
         return None
+
+    def exists(self, type_: type, key: object):
+        return self.get(type_, key, False) is not None
 
     def attach(self, subject: Subject):
         subject.on_attribute_changed = (

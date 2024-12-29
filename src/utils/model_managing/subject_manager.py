@@ -1,5 +1,6 @@
 
 
+import threading
 from utils.notifier.change_notifier import ChangeNotifier
 from utils.model_managing.subject_session import SubjectSession
 from utils.model_managing.subject import Subject
@@ -9,8 +10,7 @@ class SubjectManager:
     def __init__(self):
         self._notifier = ChangeNotifier()
         self._subjects: set[Subject] = set()
-
-        self._active_session = False
+        self._lock = threading.Lock()
 
     def get_notifier(self):
         return self._notifier
@@ -19,7 +19,6 @@ class SubjectManager:
                   new: set[Subject],
                   dirty: set[Subject],
                   deleted: set[Subject]):
-        self._active_session = False
 
         with self._notifier.create_session() as notifier:
             for s in new:
@@ -31,9 +30,6 @@ class SubjectManager:
                 notifier.notify_delete(s)
 
     def create_session(self) -> SubjectSession:
-        if self._active_session:
-            raise ValueError('there is already an active session')
-        self._active_session = True
-        session = SubjectSession(self._subjects)
+        session = SubjectSession(self._subjects, self._lock)
         session.on_flush = self.on_commit
         return session

@@ -8,11 +8,13 @@ from interface.http_endpoints.http_utils\
       import bad_request, internal_server_error, ok
 from model.exeptions import IndexValueError
 from interface.services.client_request_service import ClientRequestService
+from model.local_model.client_session_manager import ClientSessionManager
 from utils.db.db_context import DBContext
 from interface.services.client_connection_service import ClientConnectionService
 from model.db_model.client_manager import ClientManager
 from interface.data_objects import ClientDO
 from utils.http_utils import Param, get_request_parameters
+from utils.model_managing.subject_manager import SubjectManager
 
 
 clients_pb = Blueprint('clients', __name__)
@@ -91,13 +93,8 @@ def server_request(rs: ClientRequestService, db: DBContext):
 
 @clients_pb.route('/clients', methods=['GET'])
 @inject
-def get_clients(db: DBContext, ccs: ClientConnectionService):
-    with db.create_session() as session:
-        return [
-            ClientDO(
-                id=c.id,
-                name=c.name,
-                state=c.state.value,
-                connected=ccs.is_connected(c.id)
-            ) for c in ClientManager.all(session)
-        ], 200
+def get_clients(db: DBContext,
+                sm: SubjectManager):
+    with db.create_session() as dbs, sm.create_session() as ls:
+        return [ClientDO.create(c, ClientSessionManager.exists(ls, c.id))
+                for c in ClientManager.all(dbs)], 200

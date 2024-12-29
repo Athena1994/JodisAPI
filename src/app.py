@@ -14,6 +14,7 @@ from utils.db.db_context import DBContext
 from interface.services.client_connection_service import ClientConnectionService
 from interface.http_endpoints.clients import clients_pb
 from interface.http_endpoints.jobs import jobs_pb
+from interface.http_endpoints.progress import progress_pb
 from utils.model_managing.subject_manager import SubjectManager
 
 
@@ -43,12 +44,13 @@ def configure(binder):
 app = Flask(__name__)
 app.register_blueprint(clients_pb)
 app.register_blueprint(jobs_pb)
+app.register_blueprint(progress_pb)
 
 
 CORS(app, resources={r"/*": {"origins": "*"}}, automatic_options=True)
 
 socketio = SocketIO(app, cors_allowed_origins="*")
-socketio.on_namespace(ClientEventNamespace(db, ccs))
+socketio.on_namespace(ClientEventNamespace(db, sm, ccs))
 socketio.on_namespace(UpdateEventNamespace())
 
 
