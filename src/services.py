@@ -1,4 +1,5 @@
 
+from app_config import AppConfig
 from interface.services.client_connection_service import ClientConnectionService
 from interface.services.client_request_service import ClientRequestService
 from interface.services.module_service import ModuleService
@@ -15,9 +16,9 @@ def get(name: str):
     return _services[name]
 
 
-def init(cfg: dict):
+def init(cfg: AppConfig):
     _services['sm'] = SubjectManager()
-    _services['db'] = DBContext(DBContext.Config.from_dict(cfg['db']))
+    _services['db'] = DBContext(cfg.db)
     _services['ues'] = UpdateEventService(_services['db'], _services['sm'])
     _services['ccs'] = ClientConnectionService(_services['sm'])
     _services['crs'] = ClientRequestService(_services['ccs'])
