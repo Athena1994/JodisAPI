@@ -21,17 +21,17 @@ class ServerModuleManager:
         self._model: models.ServerModule \
             = session.get(models.ServerModule, module_name, True)
 
-    def model(self) -> models.ServerModule:
-        return self._model
+    """
+    Tries to load complete server module from module path with given name.
 
-    """Tries to load complete server module from module path with given name
-    name"""
+    Note: A valid module needs at least a config file.
+    """
     @staticmethod
-    def load(session: SubjectSession, name: str)\
+    def load_from_dir(session: SubjectSession, name: str)\
             -> models.ServerModule:
         logging.info(f"Loading server module '{name}'")
 
-        module_path = path_builder.build_path(app_config.modules.path)
+        module_path = path_builder.build_path(name, app_constants.MODULE_DOMAIN)
 
         # load cfg file
         cfg_file = os.path.join(module_path,
@@ -40,20 +40,35 @@ class ServerModuleManager:
             raise FileNotFoundError(f"Configuration file '{cfg_file}' not "
                                     "found!")
 
-        cfg: dict = {}
-        with open(cfg_file, 'r') as f:
-            cfg = json.load(f)
+        module = models.ServerModule(name=name, version_ids=dict())
 
-        module = models.ServerModule(
-            name=name,
-            description=cfg.get('description', 'No description provided'),
-            enabled=cfg.get('enabled', True),
-            autostart=cfg.get('autostart', False),
-        )
+        cfg: dict = {}
+
+        try:
+            with open(cfg_file, 'r') as f:
+                cfg = json.load(f)
+
+            if 'description' in cfg:
+                module.description = cfg['description']
+
+            if 'enabled' in cfg:
+                module.enabled = cfg['enabled']
+
+            if 'autostart' in cfg:
+                module.autostart = cfg['autostart']
+
+        except json.JSONDecodeError as e:
+            module.error = models.ModuleError(
+                code=models.ModuleError.Type.CFG_INVALID,
+                description=f"config file has invalid format: {e}",
+                name="ConfigParseError")
+            logging.warning(f"Error loading module '{name}': {e}")
 
         session.add(module)
 
         ServerModuleManager(session, name).update_versions()
+
+        return module
 
     @staticmethod
     def delete(session: SubjectSession, module_name: str) -> None:
@@ -73,20 +88,7 @@ class ServerModuleManager:
     def all(session: SubjectSession) -> set[models.ServerModule]:
         return session.get_all(models.ServerModule)
 
-    def get_active_version(self) -> ServerModuleVersionManager | None:
-        model = self.model()
-        if model.active_version is None:
-            return None
-
-        if model.active_version not in model.version_ids:
-            return None
-
-        return ServerModuleVersionManager(
-            self._session, model.version_ids[model.active_version])
-
-    def is_running(self) -> bool:
-        active_version = self.get_active_version()
-        return active_version.model().running if active_version else False
+    # --- control ----------------------------
 
     """
     Updates the versions of the module by detecting all versions in the module.
@@ -126,6 +128,31 @@ class ServerModuleManager:
         # update versions
         for version in (ServerModuleVersionManager.get_versions_by_ids(
                 self._session, module.version_ids.values())):
-            ServerModuleVersionManager(self._session, version.id).initialize_and_validate()
+            ServerModuleVersionManager(self._session,
+                                       version.id).initialize_and_validate()
 
+    # --- getter ------------------------------
 
+    def model(self) -> models.ServerModule:
+        return self._model
+
+    def get_active_version(self) -> models.ServerModuleVersion | None:
+        model = self.model()
+        if model.active_version is None:
+            return None
+
+        if model.active_version not in model.version_ids:
+            return None
+
+        return ServerModuleVersionManager(
+            self._session, model.version_ids[model.active_version]).model()
+
+    def is_running(self) -> bool:
+        active_version = self.get_active_version()
+        return active_version.running if active_version else False
+
+    def has_error(self) -> bool:
+        return self.model().error is not None
+
+    def get_last_error(self) -> models.ModuleError | None:
+        return self.model().error
