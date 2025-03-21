@@ -66,8 +66,10 @@ class ServerModule(Subject):
     name = Attribute('name', str, primary_key=True)
     description = Attribute('description', str, 'No description provided')
 
-    enabled = Attribute('enabled', bool)
-    autostart = Attribute('autostart', bool)
+    enabled = Attribute('enabled', bool, False)
+    autostart = Attribute('autostart', bool, False)
 
-    version_ids = Attribute('versions', Dict[str, int], {})
-    active_version = Attribute('active_version', str, None, True)
+    version_ids = Attribute('versions', dict)
+    active_version = Attribute('active_version', str | None, None, True)
+
+    error = Attribute('error', ModuleError | None, None, True)
