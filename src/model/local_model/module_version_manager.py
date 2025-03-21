@@ -2,10 +2,8 @@
 import json
 import logging
 import os
-import app_constants
 from model.exeptions import StateError
 from model.local_model import models
-from utils import hash_utils, path_builder
 from utils.model_managing.subject_session import SubjectSession
 from _hashlib import HASH as Hash
 
@@ -36,11 +34,8 @@ class ServerModuleVersionManager:
     """
     @staticmethod
     def load_from_dir(session: SubjectSession,
-                      module: str, version_str: str) \
+                      module_path: str, version_str: str) \
             -> models.ServerModuleVersion:
-
-        module_path = path_builder.build_path(module,
-                                              app_constants.MODULE_DOMAIN)
 
         version_path = os.path.join(module_path, version_str)
 
