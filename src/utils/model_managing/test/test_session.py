@@ -2,9 +2,9 @@
 
 import unittest
 
-from src.utils.model_managing.attribute import Attribute
-from src.utils.model_managing.subject_session import SubjectSession
-from src.utils.model_managing.subject import Subject
+from utils.model_managing.attribute import Attribute
+from utils.model_managing.subject_session import SubjectSession
+from utils.model_managing.subject import Subject
 
 
 class DummySubject(Subject):

@@ -2,7 +2,7 @@
 
 import unittest
 
-from src.utils.model_managing.attribute import Attribute
+from utils.model_managing.attribute import Attribute
 
 
 old = None
