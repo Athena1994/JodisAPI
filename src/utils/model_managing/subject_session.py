@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 import threading
-from src.utils.model_managing.subject import Subject
+from utils.model_managing.subject import Subject
 from utils.session.flushable_session import FlushableSession
 
 
@@ -69,10 +69,10 @@ class SubjectSession(FlushableSession):
                     new_value)
         )
 
-    def detach(self, subject: Subject):
+    def detach(self, subject: Subject) -> None:
         subject.on_attribute_changed = None
 
-    def add(self, subject: Subject):
+    def add(self, subject: Subject) -> Subject:
         if subject in self._subjects:
             raise ValueError('Subject already in session')
         self._subjects.add(subject)
@@ -85,6 +85,8 @@ class SubjectSession(FlushableSession):
             self._new.add(subject)
 
         self.attach(subject)
+
+        return subject
 
     def delete(self, subject: Subject):
         if subject not in self._subjects:

@@ -1,5 +1,6 @@
 
 
+import uuid
 from utils.model_managing.attribute import Attribute
 
 
@@ -7,8 +8,8 @@ class Subject:
 
     def __init__(self, **kwargs: dict) -> None:
 
-        # get all Attribute fields and initialize them according to kwargs and
-        # default values
+        # get all Attribute fields and initialize them according to kwargs,
+        # default values and auto_uid
         self._attributes_dict \
             = {k: v for k, v in dict(type(self).__dict__).items()
                if isinstance(v, Attribute)}
@@ -26,6 +27,8 @@ class Subject:
                 setattr(self, k, kwargs[k])
             elif att._default is not None or att._nullable:
                 setattr(self, k, att._default)
+            elif att._auto_uid:
+                setattr(self, k, uuid.uuid4().int)
             else:
                 raise ValueError(f'Initial value for attribute {k} not '
                                  'provided!')
