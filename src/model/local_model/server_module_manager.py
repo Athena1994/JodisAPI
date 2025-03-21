@@ -1,5 +1,3 @@
-
-from dataclasses import dataclass
 import json
 import logging
 import os
@@ -9,7 +7,6 @@ from model.local_model import models
 from model.local_model.module_version_manager import ServerModuleVersionManager
 from utils import path_builder
 from utils.model_managing.subject_session import SubjectSession
-from app_config import config as app_config
 import app_constants
 
 
@@ -17,15 +14,7 @@ class ServerModuleManager:
 
     MODULE_CONFIG_FILE_NAME = "config.json"
 
-    @dataclass
-    class Config:
-        path: str
-
-        @staticmethod
-        def from_dict(cfg: dict) -> 'ServerModuleManager.Config':
-            return ServerModuleManager.Config(
-                cfg.get('path', 'modules/')
-            )
+    # --- creation/destruction -------------------
 
     def __init__(self, session: SubjectSession, module_name: str):
         self._session = session

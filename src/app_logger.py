@@ -1,35 +1,12 @@
-from dataclasses import dataclass
 from datetime import datetime
 import logging
 import os
 
 from utils import path_builder
-from app_config import config as app_config
+from app_config import LoggingConfig, config as app_config
 
 _formater = None
 _log_path = None
-
-
-@dataclass
-class Config:
-    verbosity: str
-    log_path: str
-    use_file: bool
-    use_stdout: bool
-    format: str
-
-    DEFAULT_FMT = "%(asctime)s [%(threadName)-12.12s] " \
-                  "[%(levelname)-5.5s]  %(message)s"
-
-    @staticmethod
-    def from_dict(d: dict) -> 'Config':
-        return Config(
-            verbosity=d.get('verbosity', 'DEBUG'),
-            log_path=d.get('log_path', 'logs/'),
-            use_file=d.get('use_file', False),
-            use_stdout=d.get('use_stdout', True),
-            format=d.get('format', Config.DEFAULT_FMT)
-        )
 
 
 # entries in config param overwrites default values from app config
@@ -57,7 +34,7 @@ def _configure_logger(name: str | None, config: dict) -> logging.Logger:
     return logger
 
 
-def initialize(cfg: Config) -> None:
+def initialize(cfg: LoggingConfig) -> None:
     global _formater, _log_path
 
     _log_path = path_builder.build_path(cfg.log_path)
