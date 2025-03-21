@@ -1,13 +1,15 @@
 
 
+import logging
 import os
 import app_constants
+from model.exeptions import StateError
 from model.local_model.server_module_manager import ServerModuleManager
 from utils import path_builder
 from utils.model_managing.subject_session import SubjectSession
 
 
-class ModuleService:
+class ServerModuleService:
 
     def __init__(self):
         self._version = '0.0.1'
@@ -26,6 +28,11 @@ class ModuleService:
     @staticmethod
     def examine_modules(session: SubjectSession) -> None:
 
+        # assert all modules have stopped
+        for m in ServerModuleManager.all(session):
+            if ServerModuleManager(session, m.name).is_running():
+                raise StateError(f"Module '{m.name}' is still running!")
+
         modules_path = path_builder.build_path('', app_constants.MODULE_DOMAIN)
 
         # create module path if it does not exist
@@ -36,15 +43,17 @@ class ModuleService:
         detected_modules = set(os.listdir(modules_path))
 
         registered_modules \
-            = map(lambda m: m.name, ServerModuleManager.all(session))
+            = set(map(lambda m: m.name, ServerModuleManager.all(session)))
 
         for module_name in detected_modules - registered_modules:
-            ServerModuleManager.load(session, module_name)
+            try:
+                ServerModuleManager.load_from_dir(session, module_name)
+            except FileNotFoundError as e:
+                logging.warning("module path does not contain valid module "
+                                f"'{module_name}': {e}")
 
         for module_name in registered_modules - detected_modules:
             ServerModuleManager.delete(session, module_name)
 
         for m in ServerModuleManager.all(session):
-            ServerModuleManager(session, m.name).update_versions(session)
-
-        session.commit()
+            ServerModuleManager(session, m.name).update_versions()
