@@ -3,7 +3,6 @@
 import logging
 import flask_socketio
 from interface.data_objects import ClientDO, ClientProgressDO, JobDO
-from interface.services.client_connection_service import ClientConnectionService
 import model.db_model.models as db_model
 import model.local_model.models as local_model
 

@@ -26,12 +26,21 @@ class AppConfig:
     modules: ServerModuleManager.Config
     db: DBContext.Config
 
-    @staticmethod
-    def from_dict(d: dict) -> 'AppConfig':
-        assert_fields_in_dict(d, ['modules', 'db'])
-        return AppConfig(
-            server=AppConfig.Server.from_dict(d.get('server', {})),
-            logging=app_logger.Config.from_dict(d.get('logging', {})),
-            modules=ServerModuleManager.Config.from_dict(d['modules']),
-            db=DBContext.Config.from_dict(d['db'])
-        )
+
+config = None
+
+
+def get() -> AppConfig:
+    return config
+
+
+def initialize(d: dict) -> None:
+    global config
+
+    assert_fields_in_dict(d, ['db'])
+    config = AppConfig(
+        server=AppConfig.Server.from_dict(d.get('server', {})),
+        logging=app_logger.Config.from_dict(d.get('logging', {})),
+        modules=ServerModuleManager.Config.from_dict(d.get('modules', {})),
+        db=DBContext.Config.from_dict(d['db'])
+    )

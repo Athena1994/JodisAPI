@@ -1,5 +1,3 @@
-from dataclasses import dataclass
-from datetime import datetime
 import json
 import logging
 import os
@@ -8,9 +6,11 @@ from flask_cors import CORS
 from flask_injector import FlaskInjector
 from flask_socketio import SocketIO
 
-
-from app_config import AppConfig
+import app_config
+import app_constants
 import app_logger
+
+import app_services
 from interface.socket_namespaces.client import ClientEventNamespace
 from interface.socket_namespaces.update import UpdateEventNamespace
 import services
@@ -28,12 +28,15 @@ def main(args: list):
 
     print("server startup...")
 
-    cfg = parse_args(args)
+    parse_args(args)
+    cfg = app_config.get()
+
     print(f'working dir: {os.getcwd()}')
 
     path_builder.initialize(cfg.server.root)
+    path_builder.add_domain(app_constants.MODULE_DOMAIN, cfg.modules.path)
     app_logger.initialize(cfg.logging)
-    services.init(cfg)
+    app_services.init(cfg)
 
     app = init_flask_app()
     socketio = init_socket_io(app)
@@ -44,7 +47,7 @@ def main(args: list):
                  port=cfg.server.port)
 
 
-def parse_args(args: list) -> AppConfig:
+def parse_args(args: list) -> None:
     if len(args) < 2:
         print("Usage: python app.py <config_file>")
         sys.exit(1)
@@ -57,7 +60,8 @@ def parse_args(args: list) -> AppConfig:
     else:
         print(f"config file: {cfg_file}")
 
-    return AppConfig.from_dict(json.load(open(cfg_file)))
+    with open(cfg_file, 'r') as f:
+        app_config.initialize(json.load(f))
 
 
 def init_flask_app() -> Flask:
