@@ -13,7 +13,7 @@ class JobManager:
         self._session = session
         self._id = id
 
-        self._model = self.model if load_model else None
+        self._model = self.model() if load_model else None
 
     def model(self) -> models.Job:
         return self._session.execute(
