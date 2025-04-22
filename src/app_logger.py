@@ -3,7 +3,8 @@ import logging
 import os
 
 from utils import path_builder
-from app_config import LoggingConfig, config as app_config
+from app_config import LoggingConfig
+import app_config
 
 _formater = None
 _log_path = None
@@ -11,7 +12,7 @@ _log_path = None
 
 # entries in config param overwrites default values from app config
 def _configure_logger(name: str | None, config: dict) -> logging.Logger:
-    log_cfg = app_config.logging
+    log_cfg = app_config.get().logging
 
     logger = logging.getLogger(name)
 

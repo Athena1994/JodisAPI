@@ -5,7 +5,7 @@ from flask_socketio import Namespace
 
 from model.db_model.client_manager import ClientManager
 from model.exeptions import StateError
-from interface.services.client_connection_service \
+from services.client_connection_service \
     import ClientConnectionService, NotConnectedError
 from model.local_model.client_session_manager import ClientSessionManager
 from model.local_model.models import ClientSession

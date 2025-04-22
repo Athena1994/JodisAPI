@@ -4,7 +4,7 @@ import os
 import re
 from model.exeptions import StateError
 from model.local_model import models
-from model.local_model.module_version_manager import ServerModuleVersionManager
+from model.local_model.server_module_version_manager import ServerModuleVersionManager
 from utils import path_builder
 from utils.model_managing.subject_session import SubjectSession
 import app_constants
@@ -27,47 +27,10 @@ class ServerModuleManager:
     Note: A valid module needs at least a config file.
     """
     @staticmethod
-    def load_from_dir(session: SubjectSession, name: str)\
+    def create(session: SubjectSession, name: str)\
             -> models.ServerModule:
-        logging.info(f"Loading server module '{name}'")
-
-        module_path = path_builder.build_path(name, app_constants.MODULE_DOMAIN)
-
-        # load cfg file
-        cfg_file = os.path.join(module_path,
-                                ServerModuleManager.MODULE_CONFIG_FILE_NAME)
-        if not os.path.exists(cfg_file):
-            raise FileNotFoundError(f"Configuration file '{cfg_file}' not "
-                                    "found!")
-
         module = models.ServerModule(name=name, version_ids=dict())
-
-        cfg: dict = {}
-
-        try:
-            with open(cfg_file, 'r') as f:
-                cfg = json.load(f)
-
-            if 'description' in cfg:
-                module.description = cfg['description']
-
-            if 'enabled' in cfg:
-                module.enabled = cfg['enabled']
-
-            if 'autostart' in cfg:
-                module.autostart = cfg['autostart']
-
-        except json.JSONDecodeError as e:
-            module.error = models.ModuleError(
-                code=models.ModuleError.Type.CFG_INVALID,
-                description=f"config file has invalid format: {e}",
-                name="ConfigParseError")
-            logging.warning(f"Error loading module '{name}': {e}")
-
         session.add(module)
-
-        ServerModuleManager(session, name).update_versions()
-
         return module
 
     @staticmethod
@@ -97,7 +60,7 @@ class ServerModuleManager:
 
     Note: Module needs to be stopped before updating versions.
     """
-    def update_versions(self) -> None:
+    def load_versions(self) -> None:
         if self.is_running():
             raise StateError("Cannot update versions while module is running")
 
@@ -112,9 +75,13 @@ class ServerModuleManager:
 
         # add new versions
         for new_version in detected_versions - registered_versions:
-            version = ServerModuleVersionManager.load_from_dir(
-                self._session, path, new_version)
-            module.version_ids[new_version] = version.id
+            try:
+                version = ServerModuleVersionManager.load_from_dir(
+                    self._session, path, new_version)
+                module.version_ids[new_version] = version.id
+            except FileNotFoundError as e:
+                logging.warning(f"Module '{module.name}' version '{new_version}' "
+                                f"not valid: {e}")
 
         # remove abandoned versions
         if module.active_version not in detected_versions:
@@ -131,6 +98,60 @@ class ServerModuleManager:
             ServerModuleVersionManager(self._session,
                                        version.id).initialize_and_validate()
 
+    def reload(self) -> None:
+        module = self.model()
+        logging.info(f"Loading server module '{module.name}'")
+
+        if self.is_running():
+            raise StateError("Cannot reload module while it is running")
+
+        # clean up old version
+        for version in ServerModuleVersionManager.get_versions_by_ids(
+                self._session, module.version_ids.values()):
+            ServerModuleVersionManager(self._session,
+                                       version.id).delete()
+        module.version_ids.clear()
+        module.active_version = None
+        module.error = None
+
+        module_path = path_builder.build_path(module.name,
+                                              app_constants.MODULE_DOMAIN)
+
+        # load cfg file
+        cfg_file = os.path.join(module_path,
+                                ServerModuleManager.MODULE_CONFIG_FILE_NAME)
+        if not os.path.exists(cfg_file):
+            module.error = models.ModuleError(
+                code=models.ModuleError.Type.CFG_MISSING,
+                description=f"config file '{cfg_file}' not found",
+                name="ConfigFileMissing")
+            raise FileNotFoundError(f"Configuration file '{cfg_file}' not "
+                                    "found!")
+
+        cfg: dict = {}
+
+        try:
+            with open(cfg_file, 'r') as f:
+                cfg = json.load(f)
+
+            if 'description' in cfg:
+                module.description = cfg['description']
+
+            if 'enabled' in cfg:
+                module.enabled = cfg['enabled']
+
+            if 'autostart' in cfg:
+                module.autostart = cfg['autostart']
+
+        except json.JSONDecodeError as e:
+            module.error = models.ModuleError(
+                code=models.ModuleError.Type.CFG_INVALID,
+                description=f"config file has invalid format: {e}",
+                name="ConfigParseError")
+            logging.warning(f"Error loading module '{module.name}': {e}")
+
+        ServerModuleManager(self._session, module.name).load_versions()
+
     # --- getter ------------------------------
 
     def model(self) -> models.ServerModule:
@@ -146,6 +167,13 @@ class ServerModuleManager:
 
         return ServerModuleVersionManager(
             self._session, model.version_ids[model.active_version]).model()
+
+    def get_version(self, version: str) -> models.ServerModuleVersion:
+        model = self.model()
+        if version not in model.version_ids:
+            raise KeyError(f"Version '{version}' not found")
+        return ServerModuleVersionManager(
+            self._session, model.version_ids[version]).model()
 
     def is_running(self) -> bool:
         active_version = self.get_active_version()

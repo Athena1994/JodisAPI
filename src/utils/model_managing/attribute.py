@@ -45,7 +45,7 @@ class Attribute(property):
         if value is None and not self._nullable:
             raise ValueError(f'Attribute {self._name} cannot be None!')
 
-        if not isinstance(value, self._type):
+        if value is not None and not isinstance(value, self._type):
             raise ValueError(f'Attribute {self._name} must be of '
                              f'type {self._type}')
 

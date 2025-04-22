@@ -13,7 +13,6 @@ import app_logger
 import app_services
 from interface.socket_namespaces.client import ClientEventNamespace
 from interface.socket_namespaces.update import UpdateEventNamespace
-import services
 from interface.http_endpoints.clients import clients_pb
 from interface.http_endpoints.jobs import jobs_pb
 from interface.http_endpoints.progress import progress_pb
@@ -73,16 +72,16 @@ def init_flask_app() -> Flask:
     app.register_blueprint(meta_pb)
 
     CORS(app, resources={r"/*": {"origins": "*"}}, automatic_options=True)
-    FlaskInjector(app, modules=[services.flask_injector_configure])
+    FlaskInjector(app, modules=[app_services.flask_injector_configure])
 
     return app
 
 
 def init_socket_io(app: Flask) -> SocketIO:
     socketio = SocketIO(app, cors_allowed_origins="*")
-    socketio.on_namespace(ClientEventNamespace(services.get('db'),
-                                               services.get('sm'),
-                                               services.get('ccs')))
+    socketio.on_namespace(ClientEventNamespace(app_services.get('db'),
+                                               app_services.get('sm'),
+                                               app_services.get('ccs')))
     socketio.on_namespace(UpdateEventNamespace())
     return socketio
 

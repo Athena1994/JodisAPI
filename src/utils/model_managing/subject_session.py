@@ -52,7 +52,7 @@ class SubjectSession(FlushableSession):
                 return s
 
         if raise_:
-            raise IndexError('Subject not found')
+            raise IndexError(f'Subject {key} not found')
 
         return None
 

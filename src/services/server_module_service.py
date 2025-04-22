@@ -2,26 +2,47 @@
 
 import logging
 import os
+from typing import List, Tuple
 import app_constants
 from model.exeptions import StateError
+from model.local_model.models import ServerModule, ServerModuleVersion
 from model.local_model.server_module_manager import ServerModuleManager
+from model.local_model.server_module_version_manager import ServerModuleVersionManager
 from utils import path_builder
+from utils.model_managing.subject_manager import SubjectManager
 from utils.model_managing.subject_session import SubjectSession
 
 
 class ServerModuleService:
 
-    def __init__(self):
+    def __init__(self, sm: SubjectManager):
+        self._sm = sm
         self._version = '0.0.1'
 
     def get_version(self):
         return self._version
 
-    def get_modules(self):
-        return ['module1', 'module2', 'module3']
+    def get_module_version(self, module_name: str, version: str) \
+            -> ServerModuleVersion:
+        with self._sm.create_session() as session:
+            return ServerModuleManager(session, module_name)\
+                .get_version(version)
 
-    def register_module(self, module_name):
-        return f"Module {module_name} registered!"
+    def get_module(self, module_name: str) \
+            -> Tuple[ServerModule, List[ServerModuleVersion],
+                     ServerModuleVersion]:
+        with self._sm.create_session() as session:
+            module = ServerModuleManager(session, module_name)
+            versions = ServerModuleVersionManager.get_versions_by_ids(
+                session, module.model().version_ids.values())
+            active_version = module.get_active_version()
+            return module.model(), versions, active_version
+
+    def get_modules(self) -> List[Tuple[ServerModule, ServerModuleVersion]]:
+        with self._sm.create_session() as session:
+            return [(m,
+                     ServerModuleManager(session, m.name).get_active_version())
+                    for m in ServerModuleManager.all(session)]
 
     """Detect all modules in the module path and register them. Creates the
     module path if it does not exist."""
@@ -47,7 +68,8 @@ class ServerModuleService:
 
         for module_name in detected_modules - registered_modules:
             try:
-                ServerModuleManager.load_from_dir(session, module_name)
+                ServerModuleManager.create(session, module_name)
+                ServerModuleManager(session, module_name).reload()
             except FileNotFoundError as e:
                 logging.warning("module path does not contain valid module "
                                 f"'{module_name}': {e}")
@@ -56,4 +78,23 @@ class ServerModuleService:
             ServerModuleManager.delete(session, module_name)
 
         for m in ServerModuleManager.all(session):
-            ServerModuleManager(session, m.name).update_versions()
+            ServerModuleManager(session, m.name).load_versions()
+
+    def reload_module(self, module_name: str) -> ServerModule:
+        """Reloads the module and returns the module object."""
+        with self._sm.create_session() as session:
+            module = ServerModuleManager(session, module_name)
+            try:
+                module.reload()
+            except Exception:
+                pass
+
+            session.commit()
+
+            logging.info(module.model().version_ids)
+            return module.model()
+
+    def initialize(self, sm: SubjectManager):
+        with sm.create_session() as session:
+            self.examine_modules(session)
+            session.commit()

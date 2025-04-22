@@ -4,6 +4,7 @@ import logging
 import os
 from model.exeptions import StateError
 from model.local_model import models
+from utils import hash_utils
 from utils.model_managing.subject_session import SubjectSession
 from _hashlib import HASH as Hash
 
@@ -94,7 +95,7 @@ class ServerModuleVersionManager:
 
         except models.ModuleError as e:
             logger = logging.getLogger()
-            logger.warning(f"Failed to create version from dir: {e}")
+            logger.warning(f"Invalid Version: {e}")
             version.error = e
 
         session.add(version)

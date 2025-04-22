@@ -2,7 +2,6 @@
 
 from dataclasses import dataclass
 import enum
-from typing import Dict
 
 from utils.model_managing.attribute import Attribute
 from utils.model_managing.subject import Subject
@@ -29,6 +28,7 @@ class ModuleError(BaseException):
         PATH_NOT_FOUND = 0x01
         CFG_INVALID = 0x02
         UNKNOWN = 0x03
+        CFG_MISSING = 0x04
 
     name: str
     description: str
@@ -55,11 +55,13 @@ class ServerModuleVersion(Subject):
 
     running = Attribute('running', bool, False)
 
+    is_job_processor = Attribute('job_processor', bool, False)
+
     initialized = Attribute('initialized', bool, False)
     last_validation_succeeded = Attribute('src_validated', bool, False)
-    last_src_hash = Attribute('last_src_hash', str | None, None, True)
+    last_src_hash = Attribute('last_src_hash', str, None, True)
 
-    error = Attribute('error', ModuleError | None, None, True)
+    error = Attribute('error', ModuleError, None, True)
 
 
 class ServerModule(Subject):
@@ -70,6 +72,6 @@ class ServerModule(Subject):
     autostart = Attribute('autostart', bool, False)
 
     version_ids = Attribute('versions', dict)
-    active_version = Attribute('active_version', str | None, None, True)
+    active_version = Attribute('active_version', str, None, True)
 
-    error = Attribute('error', ModuleError | None, None, True)
+    error = Attribute('error', ModuleError, None, True)

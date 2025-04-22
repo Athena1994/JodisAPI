@@ -10,7 +10,7 @@ import app_config
 import app_constants
 from model.exeptions import StateError
 from model.local_model.models import ModuleError, ServerModuleVersion
-from model.local_model.module_version_manager import ServerModuleVersionManager
+from model.local_model.server_module_version_manager import ServerModuleVersionManager
 from model.local_model.server_module_manager import ServerModuleManager
 from services.server_module_service import ServerModuleService
 from utils import path_builder
@@ -337,18 +337,18 @@ class ServerModuleManagerTest(unittest.TestCase):
         # set version as running
         v.running = True
         self.assertTrue(smm.is_running())
-        self.assertRaises(StateError, lambda: smm.update_versions())
+        self.assertRaises(StateError, lambda: smm.load_versions())
         v.running = False
         self.assertFalse(smm.is_running())
 
         _copy_modules_dir('update_module_versions/2')
-        smm.update_versions()
+        smm.load_versions()
         self.assertSetEqual(set(module.version_ids.keys()), {'1.0.0', '1.0.1'})
         self.assertEqual(len(get_versions()), 2)
         self.assertEqual(smm.get_active_version().version, '1.0.0')
 
         _copy_modules_dir('update_module_versions/3')
-        smm.update_versions()
+        smm.load_versions()
         self.assertSetEqual(set(module.version_ids.keys()), {'1.0.3'})
         self.assertEqual(len(get_versions()), 1)
         self.assertIsNone(smm.get_active_version())
