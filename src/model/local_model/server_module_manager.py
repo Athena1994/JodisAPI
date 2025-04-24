@@ -4,7 +4,8 @@ import os
 import re
 from model.exeptions import StateError
 from model.local_model import models
-from model.local_model.server_module_version_manager import ServerModuleVersionManager
+from model.local_model.server_module_version_manager \
+    import ServerModuleVersionManager
 from utils import path_builder
 from utils.model_managing.subject_session import SubjectSession
 import app_constants
@@ -23,8 +24,6 @@ class ServerModuleManager:
 
     """
     Tries to load complete server module from module path with given name.
-
-    Note: A valid module needs at least a config file.
     """
     @staticmethod
     def create(session: SubjectSession, name: str)\
@@ -80,8 +79,8 @@ class ServerModuleManager:
                     self._session, path, new_version)
                 module.version_ids[new_version] = version.id
             except FileNotFoundError as e:
-                logging.warning(f"Module '{module.name}' version '{new_version}' "
-                                f"not valid: {e}")
+                logging.warning(f"Module '{module.name}' version "
+                                f"'{new_version}' not valid: {e}")
 
         # remove abandoned versions
         if module.active_version not in detected_versions:
@@ -96,7 +95,7 @@ class ServerModuleManager:
         for version in (ServerModuleVersionManager.get_versions_by_ids(
                 self._session, module.version_ids.values())):
             ServerModuleVersionManager(self._session,
-                                       version.id).initialize_and_validate()
+                                       version.id).validate_file_structure()
 
     def reload(self) -> None:
         module = self.model()

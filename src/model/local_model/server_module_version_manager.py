@@ -4,6 +4,7 @@ import logging
 import os
 from model.exeptions import StateError
 from model.local_model import models
+from model.local_model.module_interface.component_provider import ComponentProvider
 from utils import hash_utils
 from utils.model_managing.subject_session import SubjectSession
 from _hashlib import HASH as Hash
@@ -123,7 +124,7 @@ class ServerModuleVersionManager:
     """
         Initializes version directory and validates src.
     """
-    def initialize_and_validate(self) -> bool:
+    def validate_file_structure(self) -> bool:
         model = self.model()
 
         if model.initialized and self.is_src_validated():

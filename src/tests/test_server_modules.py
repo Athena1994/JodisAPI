@@ -203,7 +203,7 @@ class ServerModuleVersionManagerTest(unittest.TestCase):
 
         # assert initialization succeeds
         self.assertIsNone(vm.model().last_src_hash)
-        self.assertTrue(vm.initialize_and_validate())
+        self.assertTrue(vm.validate_file_structure())
         self.assertTrue(vm.is_initialized())
         self.assertTrue(os.path.exists(vm.get_working_path()))
 
@@ -226,7 +226,7 @@ class ServerModuleVersionManagerTest(unittest.TestCase):
 
         # assert initialization succeeds
         self.assertIsNone(vm.model().last_src_hash)
-        self.assertTrue(vm.initialize_and_validate())
+        self.assertTrue(vm.validate_file_structure())
         self.assertTrue(vm.is_initialized())
         self.assertTrue(os.path.exists(vm.get_working_path()))
 

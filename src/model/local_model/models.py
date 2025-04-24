@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 import enum
 
+from model.local_model.module_interface.module_control import ModuleControl
 from utils.model_managing.attribute import Attribute
 from utils.model_managing.subject import Subject
 
@@ -50,7 +51,6 @@ class ServerModuleVersion(Subject):
 
     api_version = Attribute('api_version', str, '0.0.0')
 
-    src_dir = Attribute('src_dir', str, 'src')
     working_dir = Attribute('working_dir', str, 'rt')
 
     running = Attribute('running', bool, False)
@@ -65,13 +65,13 @@ class ServerModuleVersion(Subject):
 
 
 class ServerModule(Subject):
-    name = Attribute('name', str, primary_key=True)
+    id = Attribute('id', int, primary_key=True, auto_uid=True)
+
+    version = Attribute('version', str)
+    name = Attribute('name', str)
+
     description = Attribute('description', str, 'No description provided')
 
-    enabled = Attribute('enabled', bool, False)
-    autostart = Attribute('autostart', bool, False)
-
-    version_ids = Attribute('versions', dict)
-    active_version = Attribute('active_version', str, None, True)
+    control = Attribute('control', ModuleControl, None, True)
 
     error = Attribute('error', ModuleError, None, True)
