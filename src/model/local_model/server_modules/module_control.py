@@ -3,8 +3,9 @@ import enum
 import json
 from pathlib import Path
 
-from model.local_model.module_interface.module_fs_control import ModuleFSControl
 from utils.config_utils import assert_fields_in_dict
+
+from model.local_model.server_modules.module_fs_control import ModuleFSControl
 
 
 class ModuleControl:

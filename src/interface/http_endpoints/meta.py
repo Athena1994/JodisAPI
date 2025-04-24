@@ -14,7 +14,7 @@ meta_pb = Blueprint('meta', __name__)
 @meta_pb.route('/meta/version', methods=['GET'])
 @inject
 def get_version(ms: ServerModuleService):
-    return ms.get_version()
+    return ms.get_server_version()
 
 
 @meta_pb.route('/meta/module/reload', methods=['POST'])

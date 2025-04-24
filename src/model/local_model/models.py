@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 import enum
 
-from model.local_model.module_interface.module_control import ModuleControl
+from model.local_model.server_modules.module_control import ModuleControl
 from utils.model_managing.attribute import Attribute
 from utils.model_managing.subject import Subject
 
@@ -37,31 +37,6 @@ class ModuleError(BaseException):
 
     def __str__(self):
         return f"{self.name}({self.code}): {self.description}"
-
-
-class ServerModuleVersion(Subject):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-
-    id = Attribute('id', int, primary_key=True, auto_uid=True)
-
-    version = Attribute('version', str)
-
-    base_path = Attribute('base_path', str)
-
-    api_version = Attribute('api_version', str, '0.0.0')
-
-    working_dir = Attribute('working_dir', str, 'rt')
-
-    running = Attribute('running', bool, False)
-
-    is_job_processor = Attribute('job_processor', bool, False)
-
-    initialized = Attribute('initialized', bool, False)
-    last_validation_succeeded = Attribute('src_validated', bool, False)
-    last_src_hash = Attribute('last_src_hash', str, None, True)
-
-    error = Attribute('error', ModuleError, None, True)
 
 
 class ServerModule(Subject):
