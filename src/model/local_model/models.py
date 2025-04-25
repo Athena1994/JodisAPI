@@ -1,8 +1,6 @@
-
-
-from dataclasses import dataclass
 import enum
 
+from model.local_model.server_modules.utils.error import Error
 from model.local_model.server_modules.module_control import ModuleControl
 from utils.model_managing.attribute import Attribute
 from utils.model_managing.subject import Subject
@@ -23,24 +21,8 @@ class ClientSession(Subject):
     message = Attribute('message', str, '')
 
 
-@dataclass
-class ModuleError(BaseException):
-    class Type(enum.Enum):
-        PATH_NOT_FOUND = 0x01
-        CFG_INVALID = 0x02
-        UNKNOWN = 0x03
-        CFG_MISSING = 0x04
-
-    name: str
-    description: str
-    code: int = -1
-
-    def __str__(self):
-        return f"{self.name}({self.code}): {self.description}"
-
-
 class ServerModule(Subject):
-    id = Attribute('id', int, primary_key=True, auto_uid=True)
+    id = Attribute('id', str, primary_key=True)
 
     version = Attribute('version', str)
     name = Attribute('name', str)
@@ -49,4 +31,7 @@ class ServerModule(Subject):
 
     control = Attribute('control', ModuleControl, None, True)
 
-    error = Attribute('error', ModuleError, None, True)
+    error = Attribute('error', Error, None, True)
+
+    def __str__(self):
+        return f"(ServerModule: {self.name}:{self.version})"
