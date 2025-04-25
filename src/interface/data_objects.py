@@ -2,7 +2,6 @@
 
 from dataclasses import dataclass
 import enum
-from typing import List
 
 import model.db_model.models as db_model
 import model.local_model.models as local_model
@@ -120,64 +119,64 @@ class JobDO:
         return updates
 
 
-@dataclass
-class ModuleVersionDO:
-    version: str
-    api_version: str
-    is_job_processor: bool
-    error: bool
+# @dataclass
+# class ModuleVersionDO:
+#     version: str
+#     api_version: str
+#     is_job_processor: bool
+#     error: bool
 
-    @staticmethod
-    def from_model(version: local_model.ServerModuleVersion):
-        return ModuleVersionDO(version.version,
-                               version.api_version,
-                               version.is_job_processor,
-                               version.error is not None)
+#     @staticmethod
+#     def from_model(version: local_model.ServerModuleVersion):
+#         return ModuleVersionDO(version.version,
+#                                version.api_version,
+#                                version.is_job_processor,
+#                                version.error is not None)
 
 
-@dataclass
-class ModuleDO:
-    name: str
-    description: str
-    enabled: bool
-    autostart: bool
-    running: bool
-    has_error: bool
-    error: str
-    versions: list[ModuleVersionDO]
-    version: str
-    job_processor: bool
+# @dataclass
+# class ModuleDO:
+#     name: str
+#     description: str
+#     enabled: bool
+#     autostart: bool
+#     running: bool
+#     has_error: bool
+#     error: str
+#     versions: list[ModuleVersionDO]
+#     version: str
+#     job_processor: bool
 
-    @staticmethod
-    def from_model(module: local_model.ServerModule,
-                   versions: List[local_model.ServerModuleVersion],
-                   active_version: local_model.ServerModuleVersion):
+#     @staticmethod
+#     def from_model(module: local_model.ServerModule,
+#                    versions: List[local_model.ServerModuleVersion],
+#                    active_version: local_model.ServerModuleVersion):
 
-        running: bool \
-            = active_version is not None and active_version.running
-        job_processor: bool \
-            = active_version is not None and active_version.is_job_processor
-        has_error: bool \
-            = (module.error is not None) or (
-                (active_version is not None) and active_version.error)
-        error: str = ''
-        if module.error is not None:
-            error = module.error.description
-        elif active_version is not None and active_version.error is not None:
-            error = active_version.error.description
+#         running: bool \
+#             = active_version is not None and active_version.running
+#         job_processor: bool \
+#             = active_version is not None and active_version.is_job_processor
+#         has_error: bool \
+#             = (module.error is not None) or (
+#                 (active_version is not None) and active_version.error)
+#         error: str = ''
+#         if module.error is not None:
+#             error = module.error.description
+#         elif active_version is not None and active_version.error is not None:
+#             error = active_version.error.description
 
-        name: str = module.name
-        description: str = module.description
-        enabled: bool = module.enabled
-        autostart: bool = module.autostart
-        version: str = module.active_version
+#         name: str = module.name
+#         description: str = module.description
+#         enabled: bool = module.enabled
+#         autostart: bool = module.autostart
+#         version: str = module.active_version
 
-        versions = [ModuleVersionDO.from_model(v) for v in versions]
+#         versions = [ModuleVersionDO.from_model(v) for v in versions]
 
-        return ModuleDO(name,
-                        description,
-                        enabled,
-                        autostart,
-                        running, has_error, error,
-                        versions,
-                        version, job_processor)
+#         return ModuleDO(name,
+#                         description,
+#                         enabled,
+#                         autostart,
+#                         running, has_error, error,
+#                         versions,
+#                         version, job_processor)
