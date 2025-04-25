@@ -1,7 +1,5 @@
 
 from app_config import AppConfig
-from model.local_model.module_interface.component_provider \
-    import ComponentProvider
 from services.client_connection_service import ClientConnectionService
 from services.client_request_service import ClientRequestService
 from services.server_module_service import ServerModuleService
@@ -19,15 +17,12 @@ def get(name: str):
 
 
 def init(cfg: AppConfig):
-    _services['cp'] = ComponentProvider(cfg.modules.path)
     _services['sm'] = SubjectManager()
     _services['db'] = DBContext(cfg.db)
     _services['ues'] = UpdateEventService(_services['db'], _services['sm'])
     _services['ccs'] = ClientConnectionService(_services['sm'])
     _services['crs'] = ClientRequestService(_services['ccs'])
-    _services['ms'] = ServerModuleService(_services['sm'], _services['cp'])
-
-    _services['ms'].initialize(_services['sm'])
+    _services['ms'] = ServerModuleService(_services['sm'])
 
 
 def flask_injector_configure(binder):
