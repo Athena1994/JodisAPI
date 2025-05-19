@@ -1,8 +1,7 @@
 
-
-from model.db_model import models as db_model
-from model.db_model.client_manager import ClientManager
-from model.exeptions import StateError
+from jodiscore.exceptions.invalid_state_error import InvalidStateError
+from model.client import Client
+from model.manager.client_manager import ClientManager
 from services.client_connection_service import ClientConnectionService
 
 
@@ -29,14 +28,14 @@ class ClientRequestService:
 
     def request_pause_job(self, client: ClientManager):
 
-        if not client.is_in_state(db_model.Client.State.SUSPENDED):
-            raise StateError("Client must be suspended")
+        if not client.is_in_state(Client.State.SUSPENDED):
+            raise InvalidStateError("Client must be suspended")
 
         self._cs.emit(client.id(), 'pause_job')
 
     def request_cancel_job(self, client: ClientManager):
 
-        if not client.is_in_state(db_model.Client.State.SUSPENDED):
-            raise StateError("Client must be suspended")
+        if not client.is_in_state(Client.State.SUSPENDED):
+            raise InvalidStateError("Client must be suspended")
 
         self._cs.emit(client.id(), 'cancel_job')

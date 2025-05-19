@@ -2,15 +2,17 @@
 
 import logging
 import flask_socketio
-from interface.data_objects import ClientDO, ClientProgressDO, JobDO
-import model.db_model.models as db_model
-import model.local_model.models as local_model
 
+from jodiscore.dataobjects.client import ClientDO
+from jodiscore.dataobjects.job import JobDO
 from jodisutils.db.db_context import DBContext
 from jodisutils.model_managing.subject_manager import SubjectManager
 from jodisutils.session.staging_session import (
     AddDict, DeleteDict, UpdateDict, StagingSession
 )
+from model.client import Client
+from model.job import Job
+from model.job_schedule_entry import JobScheduleEntry
 
 
 class UpdateEventService:
@@ -57,61 +59,36 @@ class UpdateEventService:
         db_notifier = db.get_notifier()
         db_notifier.set_context_factory(lambda: UpdateEventService.EventStage())
 
-        db_notifier.add_listener(str(db_model.Client),
+        db_notifier.add_listener(str(Client),
                                  self.on_client_event)
-        db_notifier.add_listener(str(db_model.Job),
+        db_notifier.add_listener(str(Job),
                                  self.on_job_event)
-        db_notifier.add_listener(str(db_model.JobScheduleEntry),
+        db_notifier.add_listener(str(JobScheduleEntry),
                                  self.on_schedule_entry_event)
 
         sm_notifier = sm.get_notifier()
         sm_notifier.set_context_factory(lambda: UpdateEventService.EventStage())
-        sm_notifier.add_listener(str(local_model.ClientSession),
-                                 self.on_client_session_event)
 
     def on_client_event(self,
                         context: EventStage,
                         event: str, obj: object, data: dict):
-        client: db_model.Client = obj
+        client: Client = obj
 
         if event == 'add':
-            context.stage_add('client', ClientDO.create(client, False))
+            context.stage_add('client', client.dataobject)
         elif event == 'delete':
             context.stage_delete('client', client.id)
         elif event == 'update':
             context.stage_update(
                 'client', client.id, ClientDO.filter_updates(data))
 
-    def on_client_session_event(self,
-                                context: EventStage,
-                                event: str, obj: object, data: dict):
-
-        client_session: local_model.ClientSession = obj
-
-        if event == 'add':
-            context.stage_update('client', client_session.client_id,
-                                 {'connected': True})
-            context.stage_add('client_progress',
-                              ClientProgressDO.create(client_session))
-
-        elif event == 'delete':
-            context.stage_update('client', client_session.client_id,
-                                 {'connected': False})
-            context.stage_delete('client_progress', client_session.client_id)
-
-        elif event == 'update':
-            context.stage_update(
-                'client_progress',
-                client_session.client_id,
-                ClientProgressDO.create(client_session).__dict__)
-
     def on_job_event(self,
                      context: EventStage,
                      event: str, obj: object, data: dict):
-        job: db_model.Job = obj
+        job: Job = obj
 
         if event == 'add':
-            context.stage_add('job', JobDO.from_db(job))
+            context.stage_add('job', job.dataobject)
         elif event == 'delete':
             context.stage_delete('job', job.id)
         elif event == 'update':
@@ -120,7 +97,7 @@ class UpdateEventService:
     def on_schedule_entry_event(self,
                                 context: EventStage,
                                 event: str, obj: object, data: dict):
-        entry: db_model.JobScheduleEntry = obj
+        entry: JobScheduleEntry = obj
 
         logging.debug(f'schedule_entry ({entry}) - {event} - ')
 

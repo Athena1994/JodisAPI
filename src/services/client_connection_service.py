@@ -3,28 +3,19 @@ from typing import Dict
 
 import flask_socketio
 
-from model.local_model.client_session_manager import ClientSessionManager
-from jodisutils.model_managing.subject_manager import SubjectManager
-
 
 class NotConnectedError(Exception):
     pass
 
 
 class ClientConnectionService:
-    def __init__(self, sm: SubjectManager):
+    def __init__(self):
         self._sid_to_cid: Dict[int, int] = {}
         self._cid_to_sid: Dict[int, int] = {}
 
-        self._sm = sm
-
-    # --- properties ---
-
-    @property
+    # --- public methods ---
     def is_connected(self, cid: int) -> bool:
         return cid in self._cid_to_sid
-
-    # --- public methods ---
 
     def add(self, sid: int, cid: int):
         if sid in self._sid_to_cid:
@@ -35,10 +26,6 @@ class ClientConnectionService:
 
         self._sid_to_cid[sid] = cid
         self._cid_to_sid[cid] = sid
-
-        with self._sm.create_session() as session:
-            ClientSessionManager.create(session, cid)
-            session.commit()
 
     def remove_by_sid(self, sid: int) -> int:
         cid = self._sid_to_cid.get(sid)
@@ -82,7 +69,3 @@ class ClientConnectionService:
     def _remove(self, cid: int, sid: int):
         del self._sid_to_cid[sid]
         del self._cid_to_sid[cid]
-
-        with self._sm.create_session() as session:
-            ClientSessionManager.delete(session, cid)
-            session.commit()

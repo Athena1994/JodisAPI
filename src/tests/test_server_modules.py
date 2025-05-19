@@ -8,7 +8,7 @@
 # import app_config
 
 # import app_constants
-# from model.exeptions import StateError
+# from model.exeptions import InvalidStateError
 # from model.local_model.server_module_manager import ServerModuleManager
 # from services.server_modules.server_module_service import ServerModuleService
 # from jodisutils.files import path_builder
@@ -335,7 +335,7 @@
 #         # set version as running
 #         v.running = True
 #         self.assertTrue(smm.is_running())
-#         self.assertRaises(StateError, lambda: smm.load_versions())
+#         self.assertRaises(InvalidStateError, lambda: smm.load_versions())
 #         v.running = False
 #         self.assertFalse(smm.is_running())
 
@@ -382,7 +382,7 @@
 #         smm = ServerModuleManager(s, "mod 1")
 #         smm.model().active_version = '1.0.0'
 #         smm.get_active_version().running = True
-#         self.assertRaises(StateError,
+#         self.assertRaises(InvalidStateError,
 #                           lambda: ServerModuleService.examine_modules(s))
 #         smm.get_active_version().running = False
 #         self.assertSetEqual(
