@@ -9,7 +9,7 @@ import model.local_model.models as local_model
 from services.jobs.job_provider import JobProvider
 from services.jobs.job_service import JobService
 from services.server_modules.utils.web_component import WebComponent
-from utils.injector import inject
+from jodisutils.injector import inject
 
 
 @dataclass

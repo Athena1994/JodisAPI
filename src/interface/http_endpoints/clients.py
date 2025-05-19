@@ -4,8 +4,6 @@ import logging
 from flask import Blueprint
 from flask_injector import inject
 
-from interface.http_endpoints.http_utils\
-      import bad_request, internal_server_error, ok
 from interface.data_objects import ClientDO
 
 from services.client_request_service import ClientRequestService
@@ -15,9 +13,10 @@ from model.db_model.client_manager import ClientManager
 from model.exeptions import IndexValueError
 
 
-from utils.db.db_context import DBContext
-from utils.http_utils import Param, get_request_parameters
-from utils.model_managing.subject_manager import SubjectManager
+from jodisutils.db.db_context import DBContext
+from jodisutils.http.http_utils \
+    import Param, bad_request, get_request_parameters, internal_server_error, ok
+from jodisutils.model_managing.subject_manager import SubjectManager
 
 
 clients_pb = Blueprint('clients', __name__)

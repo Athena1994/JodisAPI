@@ -1,8 +1,8 @@
 from pathlib import Path
 
 
-from utils.config.decorator import config
-from utils.config.attribute import Attribute
+from jodisutils.config.decorator import config
+from jodisutils.config.attribute import Attribute
 
 
 @config

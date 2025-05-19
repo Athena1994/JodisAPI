@@ -1,6 +1,7 @@
-import json
+
 import logging
 import os
+from pathlib import Path
 from typing import Tuple
 from flask import Flask
 from flask_cors import CORS
@@ -23,7 +24,7 @@ from interface.http_endpoints.statics import statics_pb
 import sys
 
 from services.static_file_service import StaticFileService
-from utils import path_builder
+from jodisutils.files import path_builder
 
 
 def main(args: list):
@@ -57,16 +58,11 @@ def parse_args(args: list) -> None:
         print("Usage: python app.py <config_file>")
         sys.exit(1)
 
-    cfg_file = sys.argv[1]
-
-    if not os.path.exists(cfg_file):
-        print(f"config file {cfg_file} not found")
+    try:
+        app_config.initialize(Path(sys.argv[1]))
+    except Exception as e:
+        print(f"Error loading config file: {e}")
         sys.exit(1)
-    else:
-        print(f"config file: {cfg_file}")
-
-    with open(cfg_file, 'r') as f:
-        app_config.initialize(json.load(f))
 
 
 def init_flask_app() -> Tuple[Flask, Injector]:

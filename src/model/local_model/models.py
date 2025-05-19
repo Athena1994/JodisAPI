@@ -3,8 +3,8 @@ import enum
 from services.server_modules.utils.error import Error
 from services.server_modules.module_control import ModuleControl
 from services.server_modules.utils.module_identifier import ModuleIdentifier
-from utils.model_managing.attribute import Attribute
-from utils.model_managing.subject import Subject
+from jodisutils.model_managing.attribute import Attribute
+from jodisutils.model_managing.subject import Subject
 
 
 class ClientSession(Subject):

@@ -1,62 +1,40 @@
 
-from dataclasses import dataclass
-from aithena.utils.config_utils import assert_fields_in_dict
-from utils.db.db_context import DBContext
+from pathlib import Path
+from jodisutils.config.helper import load_config
+from jodisutils.db.db_context import DBContext
+from jodisutils.config.decorator import config as configdecorator
+from jodisutils.config.attribute import Attribute
+
+DEFAULT_FMT = "%(asctime)s [%(threadName)-12.12s] " \
+                "[%(levelname)-5.5s]  %(message)s"
 
 
-@dataclass
+@configdecorator
 class LoggingConfig:
-    verbosity: str
-    log_path: str
-    use_file: bool
-    use_stdout: bool
-    format: str
-
-    DEFAULT_FMT = "%(asctime)s [%(threadName)-12.12s] " \
-                  "[%(levelname)-5.5s]  %(message)s"
-
-    @staticmethod
-    def from_dict(d: dict) -> 'LoggingConfig':
-        return LoggingConfig(
-            verbosity=d.get('verbosity', 'DEBUG'),
-            log_path=d.get('log_path', 'logs/'),
-            use_file=d.get('use_file', False),
-            use_stdout=d.get('use_stdout', True),
-            format=d.get('format', LoggingConfig.DEFAULT_FMT)
-        )
+    verbosity: str = Attribute(default='DEBUG')
+    log_path: str = Attribute(default='logs/')
+    use_file: bool = Attribute(default=False)
+    use_stdout: bool = Attribute(default=True)
+    format: str = Attribute(default=DEFAULT_FMT)
 
 
-@dataclass
+@configdecorator
 class ServerModulesConfig:
-    path: str
-
-    @staticmethod
-    def from_dict(cfg: dict) -> 'ServerModulesConfig':
-        return ServerModulesConfig(
-            cfg.get('path', 'modules/')
-        )
+    path: str = Attribute(default='modules/')
 
 
-@dataclass
+@configdecorator
 class AppConfig:
-    @dataclass
+    @configdecorator
     class Server:
-        port: int
-        host: str
-        root: str
+        port: int = Attribute(default=5000)
+        host: str = Attribute(default='localhost')
+        root: str = Attribute(default='./')
 
-        @staticmethod
-        def from_dict(d: dict) -> 'AppConfig.Server':
-            return AppConfig.Server(
-                root=d.get('root', './'),
-                port=d.get('port', 5000),
-                host=d.get('host', 'localhost')
-            )
-
-    server: Server
-    logging: LoggingConfig
-    modules: ServerModulesConfig
-    db: DBContext.Config
+    server: Server = Attribute(default={})
+    logging: LoggingConfig = Attribute(default={})
+    modules: ServerModulesConfig = Attribute(default={})
+    db: DBContext.Config = Attribute(default={}, required=True)
 
 
 config = None
@@ -66,17 +44,7 @@ def get() -> AppConfig:
     return config
 
 
-def initialize(d: dict, enforce_mandatory_fields: bool = True) -> None:
+def initialize(path: Path) -> None:
     global config
 
-    if not enforce_mandatory_fields and 'db' not in d:
-        d['db'] = {'user': '', 'password': '', 'host': '', 'db': ''}
-
-    assert_fields_in_dict(d, ['db'])
-
-    config = AppConfig(
-        server=AppConfig.Server.from_dict(d.get('server', {})),
-        logging=LoggingConfig.from_dict(d.get('logging', {})),
-        modules=ServerModulesConfig.from_dict(d.get('modules', {})),
-        db=DBContext.Config.from_dict(d['db'])
-    )
+    config = load_config(path, AppConfig)

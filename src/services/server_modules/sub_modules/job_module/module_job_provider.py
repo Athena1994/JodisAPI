@@ -10,7 +10,7 @@ from services.server_modules.utils.py_module_provider \
 from services.server_modules.utils.web_component import WebComponent
 from services.jobs.job_provider import JobProvider
 from services.static_file_service import StaticFileService
-from utils.injector import inject
+from jodisutils.injector import inject
 
 PAYLOAD_DIR = 'payload'
 

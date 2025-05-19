@@ -3,10 +3,11 @@
 import logging
 from flask import Blueprint
 
-from interface.http_endpoints.http_utils \
+from jodisutils.http.http_utils \
       import internal_server_error, not_found, ok
+
 from services.static_file_service import StaticFileService
-from utils.injector import inject
+from jodisutils.injector import inject
 
 
 statics_pb = Blueprint('statics_pb', __name__)

@@ -11,8 +11,8 @@
 # from model.exeptions import StateError
 # from model.local_model.server_module_manager import ServerModuleManager
 # from services.server_modules.server_module_service import ServerModuleService
-# from utils import path_builder
-# from utils.model_managing.subject_session import SubjectSession
+# from jodisutils.files import path_builder
+# from jodisutils.model_managing.subject_session import SubjectSession
 
 # TEST_MODULE_PATH = "tests/rt/"
 # ASSETS_PATH = "tests/assets/"

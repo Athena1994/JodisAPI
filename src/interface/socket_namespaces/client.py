@@ -7,9 +7,9 @@ from model.db_model.client_manager import ClientManager
 from model.exeptions import StateError
 from services.client_connection_service \
     import ClientConnectionService, NotConnectedError
-from utils.db.db_context import DBContext
+from jodisutils.db.db_context import DBContext
 from interface.socket_namespaces.socket_utils import error, success
-from utils.injector import inject
+from jodisutils.injector import inject
 
 
 class ClientEventNamespace(Namespace):

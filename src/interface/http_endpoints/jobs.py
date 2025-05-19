@@ -5,16 +5,16 @@ import logging
 from flask import Blueprint, request
 from injector import inject
 
-from interface.http_endpoints.http_utils \
+from jodisutils.http.http_utils \
       import bad_request, internal_server_error, not_found, ok
 from model.exeptions import StateError
 from services.jobs.job_service import JobService
-from utils.db.db_context import DBContext
+from jodisutils.db.db_context import DBContext
 from model.db_model.job_manager import JobManager
 from interface.data_objects import JobDO, JobProviderDO, JobSessionDO
-from utils.http_utils import (Param, get_request_parameters,
-                              inject_query_parameters)
-from utils.version import Version
+from jodisutils.http.http_utils import (Param, get_request_parameters,
+                                        inject_query_parameters)
+from jodisutils.version import Version
 
 
 jobs_pb = Blueprint('jobs_pb', __name__)

@@ -8,11 +8,13 @@ from services.jobs.job_service import JobService
 from services.server_modules.server_module_service import ServerModuleService
 from services.static_file_service import StaticFileService
 from services.update_event_service import UpdateEventService
-from utils import injector
-from utils.db.db_context import DBContext
-from utils.model_managing.subject_manager import SubjectManager
+from jodisutils import injector
+
+from jodisutils.db.db_context import DBContext
+from jodisutils.model_managing.subject_manager import SubjectManager
 
 from flask_injector import singleton
+
 
 _services = {}
 

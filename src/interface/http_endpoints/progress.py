@@ -4,7 +4,7 @@ from flask_injector import inject
 
 from model.local_model.client_session_manager import ClientSessionManager
 from interface.data_objects import ClientProgressDO
-from utils.model_managing.subject_manager import SubjectManager
+from jodisutils.model_managing.subject_manager import SubjectManager
 
 
 progress_pb = Blueprint('progress', __name__)

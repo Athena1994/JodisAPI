@@ -6,9 +6,9 @@ from interface.data_objects import ClientDO, ClientProgressDO, JobDO
 import model.db_model.models as db_model
 import model.local_model.models as local_model
 
-from utils.db.db_context import DBContext
-from utils.model_managing.subject_manager import SubjectManager
-from utils.session.staging_session import (
+from jodisutils.db.db_context import DBContext
+from jodisutils.model_managing.subject_manager import SubjectManager
+from jodisutils.session.staging_session import (
     AddDict, DeleteDict, UpdateDict, StagingSession
 )
 

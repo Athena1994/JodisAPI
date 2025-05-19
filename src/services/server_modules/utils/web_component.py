@@ -1,6 +1,6 @@
 
-from utils.config.decorator import config, schema
-from utils.config.attribute import Attribute
+from jodisutils.config.decorator import config, schema
+from jodisutils.config.attribute import Attribute
 
 
 @config

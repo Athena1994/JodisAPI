@@ -8,8 +8,8 @@ from services.server_modules.utils.module_identifier import ModuleIdentifier
 from services.server_modules.utils.py_module_provider import PyModuleProvider
 from services.server_modules.utils.web_component import WebComponent
 
-from utils.config.decorator import config
-from utils.config.attribute import Attribute
+from jodisutils.config.decorator import config
+from jodisutils.config.attribute import Attribute
 
 
 class SubModule:

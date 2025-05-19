@@ -10,8 +10,8 @@ from model.local_model import models
 from model.local_model.server_module_manager import ServerModuleManager
 from services.server_modules.module_control import ModuleControl
 from services.server_modules.utils.state import State
-from utils import path_builder
-from utils.model_managing.subject_manager import SubjectManager
+from jodisutils.files import path_builder
+from jodisutils.model_managing.subject_manager import SubjectManager
 
 
 def _find_all_modules(base_path: str):

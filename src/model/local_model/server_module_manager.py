@@ -3,7 +3,7 @@
 import logging
 from model.local_model import models
 from services.server_modules.module_control import ModuleControl
-from utils.model_managing.subject_session import SubjectSession
+from jodisutils.model_managing.subject_session import SubjectSession
 
 
 class ServerModuleManager:

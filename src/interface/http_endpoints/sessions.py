@@ -3,7 +3,7 @@ import json
 from flask import Blueprint, request
 from injector import inject
 
-from utils.db.db_context import DBContext
+from jodisutils.db.db_context import DBContext
 
 
 sessions_pb = Blueprint('sessions_pb', __name__)

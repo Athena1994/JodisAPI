@@ -7,9 +7,9 @@ import zipfile
 import os
 
 
-from utils import hash_utils
-from utils.config.decorator import config
-from utils.config.attribute import Attribute
+from jodisutils.files import hash_utils
+from jodisutils.config.decorator import config
+from jodisutils.config.attribute import Attribute
 
 
 RUNTIME_PATH = "rt/"

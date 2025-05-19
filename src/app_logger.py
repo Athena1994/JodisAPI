@@ -2,7 +2,7 @@ from datetime import datetime
 import logging
 import os
 
-from utils import path_builder
+from jodisutils.files import path_builder
 from app_config import LoggingConfig
 import app_config
 

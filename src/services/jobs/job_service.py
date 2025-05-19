@@ -9,7 +9,7 @@ from model.exeptions import StateError
 from services.server_modules.utils.module_identifier import ModuleIdentifier
 from services.server_modules.utils.web_component import WebComponent
 from services.jobs.job_provider import JobProvider
-from utils.db.db_context import DBContext
+from jodisutils.db.db_context import DBContext
 
 
 class JobService:

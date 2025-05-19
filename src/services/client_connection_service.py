@@ -4,7 +4,7 @@ from typing import Dict
 import flask_socketio
 
 from model.local_model.client_session_manager import ClientSessionManager
-from utils.model_managing.subject_manager import SubjectManager
+from jodisutils.model_managing.subject_manager import SubjectManager
 
 
 class NotConnectedError(Exception):
