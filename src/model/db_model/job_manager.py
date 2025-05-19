@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from model.db_model import models
 from model.db_model.client_manager import ClientManager
 from model.exeptions import StateError
+from services.jobs.job_data import JobData
 
 
 class JobManager:
@@ -16,20 +17,23 @@ class JobManager:
         self._model = self.model() if load_model else None
 
     def model(self) -> models.Job:
-        return self._session.execute(
-            select(models.Job).where(models.Job.id == self._id)
-        ).scalar()
+        if self._model is None:
+            logging.info(f"Fetching job with id {self._id}")
+            self._model = self._session.execute(
+                select(models.Job).where(models.Job.id == self._id)
+            ).scalar()
+
+            if self._model is None:
+                raise KeyError(f"Job with id {self._id} not found")
+
+        return self._model
 
     @staticmethod
-    def create(session: Session,
-               job_config: dict, name: str, desc: str) -> int:
-        logging.info(f"Creating job with name {name}")
-
-        job = models.Job(configuration=job_config,
-                         name=name,
-                         description=desc)
+    def create(session: Session, data: JobData, name: str) -> models.Job:
+        logging.info("Creating job...")
+        job = models.Job(data=data, name=name)
         session.add(job)
-        return job.id
+        return job
 
     @staticmethod
     def delete(session: Session, id: int, force: bool) -> None:
@@ -47,16 +51,30 @@ class JobManager:
         logging.info("Fetching all jobs")
         return session.execute(select(models.Job)).scalars()
 
+    @staticmethod
+    def all_unassigned(session: Session) -> list[models.Job]:
+        return session.execute(select(models.Job).where(
+            models.Job.state == models.Job.State.UNASSIGNED
+        )).scalars()
+
+    @staticmethod
+    def client_jobs(session: Session, client_id: int) -> list[models.Job]:
+        return filter(
+            lambda j: j.schedule_entry.client_id == client_id,
+            session.execute(select(models.Job).where(
+                models.Job.state == models.Job.State.ASSIGNED,
+            )).scalars()
+        )
+
     def assign(self, client_id: int) -> None:
         logging.info(f"Assigning job {self._id} to client {client_id}")
 
         job = self.model()
 
-        if job.schedule_entry is not None:
-            raise StateError(
-                "Job already assigned to a client")
+        if job.state != job.State.UNASSIGNED:
+            raise StateError("Job already assigned to a client")
 
-        client = ClientManager(self._session, client_id, True).model()
+        client = ClientManager(self._session, client_id).model()
 
         next_rank = 0 if len(client.schedule) == 0 \
             else client.schedule[-1].rank + 1
@@ -67,7 +85,7 @@ class JobManager:
         job.state = job.State.ASSIGNED
         job.sub_state = job.SubState.SCHEDULED
 
-    def unassign_job(self, force: bool) -> None:
+    def unassign(self, force: bool) -> None:
         logging.info(f"Unassigning job {self._id}")
         job = self.model()
 

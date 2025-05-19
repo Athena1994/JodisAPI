@@ -1,25 +1,28 @@
 import json
 import logging
 import os
+from typing import Tuple
 from flask import Flask
 from flask_cors import CORS
 from flask_injector import FlaskInjector
 from flask_socketio import SocketIO
+from injector import Injector
 
 import app_config
 import app_constants
 import app_logger
-
 import app_services
+
 from interface.socket_namespaces.client import ClientEventNamespace
-from interface.socket_namespaces.update import UpdateEventNamespace
 from interface.http_endpoints.clients import clients_pb
 from interface.http_endpoints.jobs import jobs_pb
 from interface.http_endpoints.progress import progress_pb
 from interface.http_endpoints.meta import meta_pb
+from interface.http_endpoints.statics import statics_pb
 
 import sys
 
+from services.static_file_service import StaticFileService
 from utils import path_builder
 
 
@@ -37,11 +40,14 @@ def main(args: list):
     app_logger.initialize(cfg.logging)
     app_services.init(cfg)
 
-    app = init_flask_app()
+    app, injector = init_flask_app()
     socketio = init_socket_io(app)
+
+    app_services.start(injector)
 
     logging.info(f"starting server... (PORT: {cfg.server.port})")
     socketio.run(app,
+                 host=cfg.server.host,
                  use_reloader=True, debug=True,
                  port=cfg.server.port)
 
@@ -63,26 +69,24 @@ def parse_args(args: list) -> None:
         app_config.initialize(json.load(f))
 
 
-def init_flask_app() -> Flask:
+def init_flask_app() -> Tuple[Flask, Injector]:
     app = Flask(__name__)
 
     app.register_blueprint(clients_pb)
     app.register_blueprint(jobs_pb)
     app.register_blueprint(progress_pb)
     app.register_blueprint(meta_pb)
+    app.register_blueprint(app_services.get(StaticFileService).blueprint)
+    app.register_blueprint(statics_pb)
 
     CORS(app, resources={r"/*": {"origins": "*"}}, automatic_options=True)
-    FlaskInjector(app, modules=[app_services.flask_injector_configure])
-
-    return app
+    fi = FlaskInjector(app, modules=[app_services.flask_injector_configure])
+    return app, fi.injector
 
 
 def init_socket_io(app: Flask) -> SocketIO:
     socketio = SocketIO(app, cors_allowed_origins="*")
-    socketio.on_namespace(ClientEventNamespace(app_services.get('db'),
-                                               app_services.get('sm'),
-                                               app_services.get('ccs')))
-    socketio.on_namespace(UpdateEventNamespace())
+    socketio.on_namespace(ClientEventNamespace())
     return socketio
 
 

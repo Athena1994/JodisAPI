@@ -18,8 +18,13 @@ class ClientConnectionService:
 
         self._sm = sm
 
+    # --- properties ---
+
+    @property
     def is_connected(self, cid: int) -> bool:
         return cid in self._cid_to_sid
+
+    # --- public methods ---
 
     def add(self, sid: int, cid: int):
         if sid in self._sid_to_cid:
@@ -33,14 +38,6 @@ class ClientConnectionService:
 
         with self._sm.create_session() as session:
             ClientSessionManager.create(session, cid)
-            session.commit()
-
-    def _remove(self, cid: int, sid: int):
-        del self._sid_to_cid[sid]
-        del self._cid_to_sid[cid]
-
-        with self._sm.create_session() as session:
-            ClientSessionManager.delete(session, cid)
             session.commit()
 
     def remove_by_sid(self, sid: int) -> int:
@@ -73,6 +70,19 @@ class ClientConnectionService:
 
         return self._cid_to_sid[cid]
 
+    def has_sid(self, sid: int) -> bool:
+        return sid in self._sid_to_cid
+
     def emit(self, cid: int, event: str, *args):
         sid = self.get_sid(cid)
         flask_socketio.emit(event, args, to=sid, namespace='/client')
+
+    # --- private methods ---
+
+    def _remove(self, cid: int, sid: int):
+        del self._sid_to_cid[sid]
+        del self._cid_to_sid[cid]
+
+        with self._sm.create_session() as session:
+            ClientSessionManager.delete(session, cid)
+            session.commit()

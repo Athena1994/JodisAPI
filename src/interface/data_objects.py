@@ -2,9 +2,14 @@
 
 from dataclasses import dataclass
 import enum
+import json
 
 import model.db_model.models as db_model
 import model.local_model.models as local_model
+from services.jobs.job_provider import JobProvider
+from services.jobs.job_service import JobService
+from services.server_modules.utils.web_component import WebComponent
+from utils.injector import inject
 
 
 @dataclass
@@ -81,30 +86,49 @@ class JobSessionDO:
 @dataclass
 class JobDO:
     id: int
+    client_id: int
+
+    module_id: str
+    module_name: str
+
+    rank: int
+
     state: str
     sub_state: str
-    client_id: int
-    rank: int
-    config: dict
+
     name: str
-    description: str
+    config: dict
+    payload: str
+
+    timestamp: str
 
     @staticmethod
-    def from_db(job: db_model.Job):
-        client_id = (
-            job.schedule_entry.client_id
-            if job.schedule_entry is not None else -1
-        )
-        rank = job.schedule_entry.rank if job.schedule_entry is not None else -1
+    @inject
+    def from_db(job: db_model.Job, js: JobService):
+
+        if job.schedule_entry is not None:
+            client_id = job.schedule_entry.client_id
+            rank = job.schedule_entry.rank
+        else:
+            client_id = -1
+            rank = -1
 
         return JobDO(id=job.id,
+                     client_id=client_id,
+
+                     module_id=job.data.module_id,
+                     module_name=js.get_provider(job.data.module_id).name,
+
                      state=job.state.value,
                      sub_state=job.sub_state.value,
-                     client_id=client_id,
+
                      rank=rank,
-                     config=job.configuration,
+
+                     config=job.data.cfg,
                      name=job.name,
-                     description=job.description)
+                     payload=job.data.payload_key,
+
+                     timestamp=str(job.creation_timestamp))
 
     @staticmethod
     def filter_updates(updates: dict):
@@ -119,64 +143,39 @@ class JobDO:
         return updates
 
 
-# @dataclass
-# class ModuleVersionDO:
-#     version: str
-#     api_version: str
-#     is_job_processor: bool
-#     error: bool
+@dataclass
+class WebComponentDO(dict):
+    url: str
+    component: str
 
-#     @staticmethod
-#     def from_model(version: local_model.ServerModuleVersion):
-#         return ModuleVersionDO(version.version,
-#                                version.api_version,
-#                                version.is_job_processor,
-#                                version.error is not None)
+    @staticmethod
+    def create(component: WebComponent):
+        return WebComponentDO(
+            url=str(component.module_url),
+            component=component.component_class
+        )
 
 
-# @dataclass
-# class ModuleDO:
-#     name: str
-#     description: str
-#     enabled: bool
-#     autostart: bool
-#     running: bool
-#     has_error: bool
-#     error: str
-#     versions: list[ModuleVersionDO]
-#     version: str
-#     job_processor: bool
+@dataclass
+class JobProviderDO(dict):
+    id: str
+    name: str
+    version: str
+    hash: str
 
-#     @staticmethod
-#     def from_model(module: local_model.ServerModule,
-#                    versions: List[local_model.ServerModuleVersion],
-#                    active_version: local_model.ServerModuleVersion):
+    client_url: str
+    config_component: WebComponentDO
 
-#         running: bool \
-#             = active_version is not None and active_version.running
-#         job_processor: bool \
-#             = active_version is not None and active_version.is_job_processor
-#         has_error: bool \
-#             = (module.error is not None) or (
-#                 (active_version is not None) and active_version.error)
-#         error: str = ''
-#         if module.error is not None:
-#             error = module.error.description
-#         elif active_version is not None and active_version.error is not None:
-#             error = active_version.error.description
+    def to_json(self):
+        return json.dumps(self.__dict__)
 
-#         name: str = module.name
-#         description: str = module.description
-#         enabled: bool = module.enabled
-#         autostart: bool = module.autostart
-#         version: str = module.active_version
-
-#         versions = [ModuleVersionDO.from_model(v) for v in versions]
-
-#         return ModuleDO(name,
-#                         description,
-#                         enabled,
-#                         autostart,
-#                         running, has_error, error,
-#                         versions,
-#                         version, job_processor)
+    @staticmethod
+    def create(jp: JobProvider):
+        return JobProviderDO(
+            str(jp.id),
+            name=jp.name,
+            version=jp.version,
+            hash=jp.src_hash,
+            client_url=jp.client_url,
+            config_component=WebComponentDO.create(jp.config_component)
+        )

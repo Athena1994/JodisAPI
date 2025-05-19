@@ -42,13 +42,15 @@ class AppConfig:
     @dataclass
     class Server:
         port: int
+        host: str
         root: str
 
         @staticmethod
         def from_dict(d: dict) -> 'AppConfig.Server':
             return AppConfig.Server(
+                root=d.get('root', './'),
                 port=d.get('port', 5000),
-                root=d.get('root', './')
+                host=d.get('host', 'localhost')
             )
 
     server: Server

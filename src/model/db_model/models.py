@@ -4,6 +4,8 @@ from sqlalchemy import JSON, ForeignKey, String
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
+from services.jobs.job_data import JobData
+
 from datetime import datetime
 
 
@@ -34,12 +36,14 @@ class Job(Base):
 
     id: Mapped[int] = mapped_column("Id", primary_key=True, autoincrement=True)
 
-    configuration: Mapped[JSON] = mapped_column('Configuration', type_=JSON)
+    data: Mapped[JobData] = mapped_column(
+        "JobData",
+        type_=JobData.Type)
+
+    name: Mapped[str] = mapped_column("Name", String(64), nullable=True)
+
     creation_timestamp: Mapped[datetime] = mapped_column(
         'CreationTimestamp', default=func.current_timestamp())
-    name: Mapped[str] = mapped_column("Name", String(64), nullable=True)
-    description: Mapped[str] = mapped_column(
-        "Description", String(256), nullable=True)
     state: Mapped[State] = mapped_column(
         'State', default=State.UNASSIGNED)
     sub_state: Mapped[SubState] = mapped_column(

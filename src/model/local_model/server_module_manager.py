@@ -2,7 +2,7 @@
 
 import logging
 from model.local_model import models
-from model.local_model.server_modules.module_control import ModuleControl
+from services.server_modules.module_control import ModuleControl
 from utils.model_managing.subject_session import SubjectSession
 
 
@@ -19,14 +19,12 @@ class ServerModuleManager:
     @staticmethod
     def create(session: SubjectSession, mc: ModuleControl) \
             -> models.ServerModule:
-        if not mc.has_valid_config():
+        if not mc.initialized:
             raise ValueError(f"Invalid module control config: {mc}")
 
         logging.info(f"Creating ServerModule for {mc}")
         return session.add(models.ServerModule(
-            id=mc.get_identifier(),
-            version=mc._cfg.module_version,
-            name=mc._cfg.name,
+            id=mc.id,
             description="",
             control=mc,
             error=mc.error

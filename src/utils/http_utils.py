@@ -1,7 +1,46 @@
 
 from dataclasses import dataclass
+import functools
+import inspect
 from typing import Iterable, List
 from flask import request
+
+from interface.http_endpoints.http_utils import bad_request
+
+
+def inject_query_parameters(func):
+
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        r_args = dict(map(lambda i: (i[0].lower().replace('-', '_'), i[1]),
+                          request.args.items()))
+
+        sig = inspect.signature(func)
+
+        invalid_params = []
+
+        for key, value in r_args.items():
+            if key not in sig.parameters:
+                invalid_params.append(key)
+            else:
+                try:
+                    # convert to the expected type
+                    param = sig.parameters[key]
+                    if param.annotation is not inspect.Parameter.empty:
+                        r_args[key] = param.annotation(value)
+                except Exception as e:
+                    return bad_request(
+                        f"Invalid parameter type for '{key}': {str(e)}")
+
+        if len(invalid_params) > 0:
+            return bad_request("Unexpected request parameters: " +
+                               ', '.join(invalid_params))
+
+        kwargs.update(r_args)
+
+        return func(*args, **(kwargs))
+
+    return wrapper
 
 
 @dataclass
@@ -10,10 +49,18 @@ class Param:
     type_: type = None
     collection: bool = False
     flag: bool = False
+    default: object | None = None
+    optional: bool = False
 
 
 def get_request_parameter(parameter: Param) -> object:
     if parameter.name not in request.json:
+        if parameter.default is not None:
+            return parameter.default
+
+        if parameter.optional:
+            return None
+
         if parameter.flag:
             return False
         raise ValueError(f"Missing parameter: {parameter.name}")

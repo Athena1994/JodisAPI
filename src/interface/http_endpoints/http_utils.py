@@ -22,7 +22,7 @@ def bad_request(msg: str) -> Tuple[dict, int]:
 
 
 def not_found(msg: str) -> Tuple[dict, int]:
-    logging.info(f'bad request ({msg})')
+    logging.info(f'not found ({msg})')
     return json.dumps({
         'status': 'not found',
         'message': msg}), 404

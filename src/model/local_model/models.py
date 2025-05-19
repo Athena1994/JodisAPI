@@ -1,7 +1,8 @@
 import enum
 
-from model.local_model.server_modules.utils.error import Error
-from model.local_model.server_modules.module_control import ModuleControl
+from services.server_modules.utils.error import Error
+from services.server_modules.module_control import ModuleControl
+from services.server_modules.utils.module_identifier import ModuleIdentifier
 from utils.model_managing.attribute import Attribute
 from utils.model_managing.subject import Subject
 
@@ -22,10 +23,7 @@ class ClientSession(Subject):
 
 
 class ServerModule(Subject):
-    id = Attribute('id', str, primary_key=True)
-
-    version = Attribute('version', str)
-    name = Attribute('name', str)
+    id = Attribute('id', ModuleIdentifier, primary_key=True)
 
     description = Attribute('description', str, 'No description provided')
 
@@ -34,4 +32,4 @@ class ServerModule(Subject):
     error = Attribute('error', Error, None, True)
 
     def __str__(self):
-        return f"(ServerModule: {self.name}:{self.version})"
+        return f"(ServerModule: {self.id})"

@@ -4,7 +4,7 @@ from sqlalchemy import and_, func, select, tuple_
 from sqlalchemy.orm import Session
 
 from model.db_model import models
-from model.exeptions import IndexValueError, StateError
+from model.exeptions import StateError
 
 
 class ClientManager:
@@ -51,7 +51,7 @@ class ClientManager:
             ).scalar()
 
             if self._model is None:
-                raise IndexValueError(f"Client with id {self._id} not found")
+                raise KeyError(f"Client with id {self._id} not found")
 
         return self._model
 

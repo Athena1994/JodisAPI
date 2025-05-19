@@ -2,7 +2,7 @@ import logging
 from flask import Blueprint
 from injector import inject
 
-from services.server_module_service import ServerModuleService
+from services.server_modules.server_module_service import ServerModuleService
 from utils.http_utils import Param, get_request_parameter
 
 meta_pb = Blueprint('meta', __name__)

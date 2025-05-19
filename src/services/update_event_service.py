@@ -28,18 +28,26 @@ class UpdateEventService:
         def _flush_staged_data(
                 self, deletes: DeleteDict, adds: AddDict, updates: UpdateDict):
 
-            for type_, objects in adds.items():
-                self._emit(f'{type_}-added',
-                           [o.__dict__ for o in objects])
-
-            for type_, ids in deletes.items():
-                self._emit(f'{type_}-deleted', ids)
-
-            for type_, entity_updates in updates.items():
-                self._emit(f'{type_}-changed', [{
-                    'id': id,
+            try:
+                self._emit('flush', {
+                    'deletes': deletes,
+                    'adds': adds,
                     'updates': updates
-                } for id, updates in entity_updates.items()])
+                })
+                for type_, objects in adds.items():
+                    self._emit(f'{type_}-added',
+                               [o.__dict__ for o in objects])
+
+                for type_, ids in deletes.items():
+                    self._emit(f'{type_}-deleted', ids)
+
+                for type_, entity_updates in updates.items():
+                    self._emit(f'{type_}-changed', [{
+                        'id': id,
+                        'updates': updates
+                    } for id, updates in entity_updates.items()])
+            except Exception as e:
+                logging.error(f'Failed to emit update event: {e}')
 
     def __init__(self,
                  db: DBContext, sm: SubjectManager):

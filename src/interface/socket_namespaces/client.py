@@ -7,58 +7,62 @@ from model.db_model.client_manager import ClientManager
 from model.exeptions import StateError
 from services.client_connection_service \
     import ClientConnectionService, NotConnectedError
-from model.local_model.client_session_manager import ClientSessionManager
-from model.local_model.models import ClientSession
 from utils.db.db_context import DBContext
 from interface.socket_namespaces.socket_utils import error, success
-from utils.model_managing.subject_manager import SubjectManager
+from utils.injector import inject
 
 
 class ClientEventNamespace(Namespace):
 
-    def __init__(self,
-                 db: DBContext,
-                 sm: SubjectManager,
-                 ccs: ClientConnectionService):
+    def __init__(self):
         super().__init__('/client')
-        self._db = db
-        self._ccs = ccs
-        self._sm = sm
 
     # --- connection event handlers ---
 
     def on_connect(self):
         logging.info(f'Socket with id {request.sid} connected')
 
-    def on_disconnect(self):
-        self._drop_claim(request.sid)
+    @inject
+    def on_disconnect(self, ccs: ClientConnectionService):
         logging.info(f'socket {request.sid} disconnected')
+
+        if not ccs.has_sid(request.sid):
+            return
+
+        client_id = ccs.remove_by_sid(request.sid)
+        logging.info(f'Client {client_id} disconnected!')
 
     # --- client claim handlers ---
 
-    def _drop_claim(self, sid: int) -> bool:
-        client_id = self._ccs.remove_by_sid(sid)
-        if client_id is not None:
+    @inject
+    def _drop_claim(self, sid: int, ccs: ClientConnectionService) -> bool:
+        try:
+            client_id = ccs.remove_by_sid(sid)
             logging.info(f'Claim on client {client_id} dropped '
                          f'(socket {request.sid})')
             return True
-        return False
+
+        except NotConnectedError:
+            return False
 
     def on_drop_claim(self):
         if not self._drop_claim(request.sid):
             logging.warning(f'Unassigned socket {request.sid} tried to drop'
                             ' claim')
 
-    def on_claim_client(self, client_id: int):
+    @inject
+    def on_claim_client(self, client_id: int,
+                        db: DBContext, ccs: ClientConnectionService):
+
         logging.debug(f'Claiming client {client_id}')
         if not isinstance(client_id, int):
             return error(self, 'Client id must be an integer')
 
         try:
-            with self._db.create_session() as session:
+            with db.create_session() as session:
                 client = ClientManager(session, client_id).model()
 
-            self._ccs.add(request.sid, client_id)
+            ccs.add(request.sid, client_id)
             success(
                 self, 'claim_successfull', {
                     'id': client_id,
@@ -72,17 +76,20 @@ class ClientEventNamespace(Namespace):
 
     # --- client event handlers ---
 
-    def on_get_clients(self):
+    @inject
+    def on_get_clients(self, db: DBContext):
         logging.debug('Getting clients')
-        with self._db.create_session() as session:
+        with db.create_session() as session:
             clients = ClientManager.all(session)
             self.emit('clients',
                       [{'id': c.id, 'name': c.name} for c in clients])
 
-    def on_set_state(self, active: bool):
+    @inject
+    def on_set_state(self, active: bool,
+                     ccs: ClientConnectionService, db: DBContext):
 
         try:
-            client_id = self._ccs.get_cid(request.sid)
+            client_id = ccs.get_cid(request.sid)
         except NotConnectedError:
             return error(self, 'Socket is not claimed')
 
@@ -91,7 +98,7 @@ class ClientEventNamespace(Namespace):
         logging.debug(f'Setting state of client {client_id} to {target_state}')
 
         try:
-            with self._db.create_session() as session:
+            with db.create_session() as session:
                 client = ClientManager(session, client_id).model()
                 client.state = target_state
                 session.commit()
@@ -99,15 +106,17 @@ class ClientEventNamespace(Namespace):
         except Exception as e:
             error(self, str(e))
 
-    def on_get_active_job(self):
+    @inject
+    def on_get_active_job(self,
+                          ccs: ClientConnectionService, db: DBContext):
         try:
-            client_id = self._ccs.get_cid(request.sid)
+            client_id = ccs.get_cid(request.sid)
         except NotConnectedError:
             return error(self, 'socket not claimed')
 
         logging.debug(f'Client {client_id} requesting active job')
         try:
-            with self._db.create_session() as session:
+            with db.create_session() as session:
                 job = ClientManager(session, client_id).get_active_job()
             if job is None:
                 return error(self, 'No active job')
@@ -115,16 +124,18 @@ class ClientEventNamespace(Namespace):
         except Exception as e:
             error(self, str(e))
 
-    def on_claim_next_job(self):
+    @inject
+    def on_claim_next_job(self,
+                          ccs: ClientConnectionService, db: DBContext):
         try:
-            client_id = self._ccs.get_cid(request.sid)
+            client_id = ccs.get_cid(request.sid)
         except NotConnectedError:
             return error(self, 'socket is not claimed')
 
         logging.debug(f'Client {client_id} claiming next job')
 
         try:
-            with self._db.create_session() as session:
+            with db.create_session() as session:
                 job = ClientManager(session, client_id).start_next_job()
                 if job is None:
                     return error(self, "No jobs, available!")
@@ -135,59 +146,3 @@ class ClientEventNamespace(Namespace):
 
         except StateError as e:
             return error(self, {str(e)})
-
-    def on_set_phase(self, phase: str, count: int):
-        try:
-            client_id = self._ccs.get_cid(request.sid)
-        except NotConnectedError:
-            return error(self, 'socket is not claimed')
-
-        try:
-            phase = ClientSession.Phase[phase]
-        except KeyError:
-            return error(self, 'Invalid phase! allowed values are: '
-                               f'{ClientSession.Phase.__members__.keys()}')
-
-        count = int(count)
-
-        logging.debug(f'Client {client_id} setting phase to {phase} '
-                      f'(cnt: {count})')
-
-        try:
-            with self._sm.create_session() as session:
-                cs = ClientSessionManager(session, client_id)
-                cs.change_phase(phase, count)
-                session.commit()
-            success(self)
-        except Exception as e:
-            error(self, str(e))
-
-    def on_update_phase(self, ix: int, time_per_ix: float):
-        try:
-            client_id = self._ccs.get_cid(request.sid)
-        except NotConnectedError:
-            return error(self, 'socket is not claimed')
-
-        try:
-            with self._sm.create_session() as session:
-                cs = ClientSessionManager(session, client_id)
-                cs.update_phase(ix, time_per_ix)
-                session.commit()
-            success(self)
-        except Exception as e:
-            error(self, str(e))
-
-    def on_set_message(self, message: str):
-        try:
-            client_id = self._ccs.get_cid(request.sid)
-        except NotConnectedError:
-            return error(self, 'socket is not claimed')
-
-        try:
-            with self._sm.create_session() as session:
-                cs = ClientSessionManager(session, client_id)
-                cs.change_message(message)
-                session.commit()
-            success(self)
-        except Exception as e:
-            error(self, str(e))
