@@ -33,7 +33,7 @@ class ServerModuleManager:
     @staticmethod
     def delete(session: SubjectSession, id: str) -> None:
         logging.info(f"Deleting ServerModule with id {id}")
-        s = ServerModuleManager(session, id).model()
+        s = ServerModuleManager(session, id).model
         session.delete(s)
 
     @staticmethod

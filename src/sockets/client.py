@@ -8,8 +8,8 @@ from model.manager.client_manager import ClientManager
 from services.client_connection_service \
     import ClientConnectionService, NotConnectedError
 from jodisutils.db.db_context import DBContext
-from jodisutils.socket_utils import error, success
-from jodisutils.injector import inject
+from jodisutils.sockets.socket_utils import error, success
+from jodisutils.architecture.injector import inject
 
 
 class ClientEventNamespace(Namespace):
@@ -60,7 +60,7 @@ class ClientEventNamespace(Namespace):
 
         try:
             with db.create_session() as session:
-                client = ClientManager(session, client_id).model()
+                client = ClientManager(session, client_id).model
 
             ccs.add(request.sid, client_id)
             success(
@@ -99,7 +99,7 @@ class ClientEventNamespace(Namespace):
 
         try:
             with db.create_session() as session:
-                client = ClientManager(session, client_id).model()
+                client = ClientManager(session, client_id).model
                 client.state = target_state
                 session.commit()
             success(self, data={'id': client_id, 'state': target_state})

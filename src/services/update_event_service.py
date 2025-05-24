@@ -7,7 +7,7 @@ from jodiscore.dataobjects.client import ClientDO
 from jodiscore.dataobjects.job import JobDO
 from jodisutils.db.db_context import DBContext
 from jodisutils.model_managing.subject_manager import SubjectManager
-from jodisutils.session.staging_session import (
+from jodisutils.model_managing.session.staging_session import (
     AddDict, DeleteDict, UpdateDict, StagingSession
 )
 from model.client import Client

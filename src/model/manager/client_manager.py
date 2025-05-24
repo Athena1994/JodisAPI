@@ -16,7 +16,7 @@ class ClientManager:
 
         self._model = None
         if load_model:
-            self._model = self.model()
+            self._model = self.model
 
     @staticmethod
     def create(session: Session, name: str) -> Client:
@@ -35,7 +35,7 @@ class ClientManager:
         if client.get_active_job() is not None:
             raise InvalidStateError("Client has an active job")
 
-        session.delete(client.model())
+        session.delete(client.model)
 
     @staticmethod
     def all(session: Session) -> list[Client]:
@@ -45,6 +45,7 @@ class ClientManager:
             select(Client)
         ).scalars()
 
+    @property
     def model(self) -> Client:
         if self._model is None:
             logging.info(f"Fetching client with id {self._id}")
@@ -61,7 +62,7 @@ class ClientManager:
         return self._id
 
     def is_in_state(self, state: Client.State) -> bool:
-        return self.model().state == state
+        return self.model.state == state
 
     def get_active_job(self) -> Optional[Job]:
         logging.info(f"Fetching active job for client {self._id}")
@@ -72,7 +73,8 @@ class ClientManager:
                     Job.id.in_(
                       select(JobScheduleEntry.job_id)
                       .where(JobScheduleEntry.client_id == self._id)),
-                    Job.sub_state == Job.SubState.RUNNING
+                    Job.sub_state == Job.SubState.RUNNING,
+                    Job.state == Job.State.ASSIGNED
                 )
             )
         ).scalar()

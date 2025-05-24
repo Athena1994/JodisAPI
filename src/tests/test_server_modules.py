@@ -200,7 +200,7 @@
 #         self.assertFalse(os.path.exists(vm.get_working_path()))
 
 #         # assert initialization succeeds
-#         self.assertIsNone(vm.model().last_src_hash)
+#         self.assertIsNone(vm.model.last_src_hash)
 #         self.assertTrue(vm.validate_file_structure())
 #         self.assertTrue(vm.is_initialized())
 #         self.assertTrue(os.path.exists(vm.get_working_path()))
@@ -208,7 +208,7 @@
 #         # assert validation failed (src dir missing)
 #         self.assertFalse(os.path.exists(vm.get_src_path()))
 #         self.assertFalse(vm.is_src_validated())
-#         self.assertIsNotNone(vm.model().last_src_hash)
+#         self.assertIsNotNone(vm.model.last_src_hash)
 
 #         # --- v2 - src present ---
 #         version_base_path \
@@ -223,7 +223,7 @@
 #         self.assertFalse(os.path.exists(vm.get_working_path()))
 
 #         # assert initialization succeeds
-#         self.assertIsNone(vm.model().last_src_hash)
+#         self.assertIsNone(vm.model.last_src_hash)
 #         self.assertTrue(vm.validate_file_structure())
 #         self.assertTrue(vm.is_initialized())
 #         self.assertTrue(os.path.exists(vm.get_working_path()))
@@ -231,7 +231,7 @@
 #         # assert succeeded failed
 #         self.assertTrue(os.path.exists(vm.get_src_path()))
 #         self.assertTrue(vm.is_src_validated())
-#         self.assertIsNotNone(vm.model().last_src_hash)
+#         self.assertIsNotNone(vm.model.last_src_hash)
 
 
 # class ServerModuleManagerTest(unittest.TestCase):
@@ -380,7 +380,7 @@
 #         # assert examine raises on running modules
 #         _copy_modules_dir("examine_modules/2")
 #         smm = ServerModuleManager(s, "mod 1")
-#         smm.model().active_version = '1.0.0'
+#         smm.model.active_version = '1.0.0'
 #         smm.get_active_version().running = True
 #         self.assertRaises(InvalidStateError,
 #                           lambda: ServerModuleService.examine_modules(s))
@@ -393,7 +393,7 @@
 #         self.assertSetEqual(
 #             {m.name for m in ServerModuleManager.all(s)}, {"mod 1", "mod 2"})
 #         self.assertIsNone(smm.get_active_version())
-#         self.assertTrue('1.0.1' in smm.model().version_ids)
+#         self.assertTrue('1.0.1' in smm.model.version_ids)
 
 #         # assert abandoned version is removed
 #         _copy_modules_dir("examine_modules/3")

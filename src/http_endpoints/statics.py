@@ -6,8 +6,8 @@ from flask import Blueprint
 from jodisutils.http.http_utils \
       import internal_server_error, not_found, ok
 
-from jodisutils.injector import inject
-from jodisutils.static_file_provider import StaticFileProvider
+from jodisutils.architecture.injector import inject
+from jodisutils.http.static_file_provider import StaticFileProvider
 
 
 statics_pb = Blueprint('statics_pb', __name__)

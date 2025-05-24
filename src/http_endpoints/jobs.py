@@ -7,6 +7,8 @@ from injector import inject
 
 from jodiscore.dataobjects.job_provider import JobProviderDO
 from jodiscore.exceptions.invalid_state_error import InvalidStateError
+from jodiscore.server.job_provider.job_provider_control \
+    import JobProviderControl
 from model.manager.job_manager import JobManager
 from services.job_service import JobService
 
@@ -15,12 +17,25 @@ from jodisutils.http.http_utils \
 from jodisutils.db.db_context import DBContext
 from jodisutils.http.http_utils import (Param, get_request_parameters,
                                         inject_query_parameters)
-from jodisutils.version import Version
+from jodisutils.dataobjects.version import Version
 
 
 jobs_pb = Blueprint('jobs_pb', __name__)
 
 
+def log_http_request(name: str, description: str = None):
+    desc_str = f' - {description}' if description else ''
+
+    def decorator(func):
+
+        def wrapper(*args, **kwargs):
+            logging.info(f'http-request: {name}{desc_str}')
+            return func(*args, **kwargs)
+        return wrapper
+    return decorator
+
+
+@log_http_request('get-unassigned-jobs')
 @jobs_pb.route('/jobs/unassigned', methods=['GET'])
 @inject
 def get_unassigned_jobs(db: DBContext):
@@ -31,6 +46,7 @@ def get_unassigned_jobs(db: DBContext):
         return unassigned_jobs, 200
 
 
+@log_http_request('get-assigned-jobs')
 @jobs_pb.route('/client/<int:client_id>/jobs', methods=['GET'])
 @inject
 def get_assigned_jobs(client_id: int, db: DBContext):
@@ -54,18 +70,21 @@ def assign_job(client_id: int, job_id: int, js: JobService):
         return bad_request(f'Failed to assign job: {str(e)}')
 
 
+@log_http_request('get-modules')
 @jobs_pb.route('/jobs/meta/modules', methods=['GET'])
 @inject
-def get_modules(js: JobService):
-    return ([JobProviderDO.create(p).to_json() for p in js.get_all_provider()],
+def get_modules(jpc: JobProviderControl):
+    return ([JobProviderDO.create(p).to_json() for p in jpc.get_all_provider()],
             200)
 
 
 @jobs_pb.route('/jobs/meta/module/<string:name>', methods=['GET'])
 @inject
-def get_versions(js: JobService, name: str):
+def get_versions(jpc: JobProviderControl, name: str):
+    logging.info(f'http-request: Getting module versions for job '
+                 f"provider '{name}'")
     try:
-        provider = sorted(js.get_provider_by_name(name),
+        provider = sorted(jpc.get_provider_by_name(name),
                           key=lambda p: Version.parse(p.version).as_tuple(),
                           reverse=True)
     except KeyError as e:
@@ -74,16 +93,17 @@ def get_versions(js: JobService, name: str):
     return [JobProviderDO.create(p).to_json() for p in provider], 200
 
 
+@log_http_request('get-module')
 @jobs_pb.route('/jobs/meta/module/<int:id>', methods=['GET'])
 @inject
-def get_module(js: JobService, id: int):
-    return json.dumps(JobProviderDO.create(js.get_provider(id)).__dict__), 200
+def get_module(jpc: JobProviderControl, id: int):
+    return json.dumps(JobProviderDO.create(jpc.get_provider(id)).__dict__), 200
 
 
 @jobs_pb.route('/jobs/meta/compatibility', methods=['GET'])
 @inject
 @inject_query_parameters
-def check_compatability(js: JobService,
+def check_compatability(jpc: JobProviderControl,
                         module_id: int, client_version: str,
                         src_hash: str):
 
@@ -91,7 +111,7 @@ def check_compatability(js: JobService,
                  f"({src_hash})")
 
     try:
-        comp = js.is_compatible(module_id, client_version, src_hash)
+        comp = jpc.is_compatible(module_id, client_version, src_hash)
         return ok(comp, {'compatible': comp})
     except KeyError as e:
         return not_found(f'Job provider not found: {str(e)}')
@@ -99,6 +119,7 @@ def check_compatability(js: JobService,
         return bad_request(f'Invalid parameters: {str(e)}')
 
 
+@log_http_request('get-all-jobs')
 @jobs_pb.route('/jobs', methods=['GET'])
 @inject
 def get_jobs(db: DBContext):
@@ -106,6 +127,21 @@ def get_jobs(db: DBContext):
         return [j.dataobject for j in JobManager.all(session)], 200
 
 
+@log_http_request('get-job')
+@jobs_pb.route('/jobs/<int:job_id>', methods=['GET'])
+@inject
+def get_job(db: DBContext, job_id: int):
+    try:
+        with db.create_session() as session:
+            return ok(
+                data=JobManager(session, job_id).model.dataobject.__dict__)
+    except KeyError as e:
+        return not_found(f'Job not found: {str(e)}')
+    except Exception as e:
+        return internal_server_error(f'Failed to get job: {str(e)}')
+
+
+@log_http_request('validate-job')
 @jobs_pb.route('/job/validate', methods=['POST'])
 @inject
 @inject_query_parameters
@@ -122,6 +158,7 @@ def validate_config(js: JobService, module_id: int):
         return internal_server_error(e)
 
 
+@log_http_request('delete-job')
 @jobs_pb.route('/jobs/delete', methods=['POST'])
 @inject
 def delete_jobs(js: JobService):
@@ -158,6 +195,7 @@ def create_job(js: JobService, module_id: int, name: str = None):
         return internal_server_error(f'Failed to create job: {str(e)}')
 
 
+@log_http_request('assign-job')
 @jobs_pb.route('/jobs/assign', methods=['POST'])
 @inject
 def assign_jobs(js: JobService):
@@ -182,7 +220,7 @@ def assign_jobs(js: JobService):
 @inject
 @inject_query_parameters
 def unassign_jobs(js: JobService, job_id: int, force: bool = False):
-    logging.info(f'Unassigning job {job_id} (force={force})')
+    logging.info(f'http-request: Unassigning job {job_id} (force={force})')
     try:
         js.unassign_job([job_id], force)
     except Exception as e:
@@ -194,10 +232,52 @@ def unassign_jobs(js: JobService, job_id: int, force: bool = False):
 @jobs_pb.route('/jobs/start/<int:job_id>', methods=['POST'])
 @inject
 def start_job(js: JobService, job_id: int):
-    logging.info(f'starting job {job_id})')
+    logging.info(f'http-request: setting job (id: {job_id}) to running.')
     try:
         js.start_job(job_id)
     except Exception as e:
         return bad_request(f'Failed to start jobs! {e}')
+
+    return ok()
+
+
+@jobs_pb.route('/jobs/<int:job_id>/failed', methods=['POST'])
+@inject
+def set_job_substate_error(js: JobService, job_id: int):
+    logging.info(f'http-request: setting job (id: {job_id}) substate to error.')
+    try:
+        js.update_job_execution_state(job_id)
+    except Exception as e:
+        return bad_request(f'Failed to update job execution state! {e}')
+
+    return ok()
+
+
+@jobs_pb.route('/jobs/<int:job_id>/aborted', methods=['POST'])
+@inject
+def set_job_substate_aborted(js: JobService, job_id: int):
+    logging.info(f'http-request: setting job (id: {job_id}) substate to '
+                 'aborted.')
+    try:
+        js.update_job_execution_state(job_id, True)
+    except Exception as e:
+        return bad_request(f'Failed to update job execution state! {e}')
+
+    return ok()
+
+
+@jobs_pb.route('/jobs/<int:job_id>/finalize', methods=['POST'])
+@inject
+def finalize_job(js: JobService, job_id: int):
+    logging.info(f'http-request: finalizing job (id: {job_id})')
+
+    try:
+        if request.content_type == 'application/json':
+            result = request.json
+        else:
+            result = None
+        js.finalize_job(job_id, result)
+    except Exception as e:
+        return bad_request(f'Failed to finalize job! {e}')
 
     return ok()

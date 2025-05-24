@@ -5,7 +5,7 @@ from sqlalchemy import String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from jodiscore.dataobjects.client import ClientDO
-from jodisutils.injector import inject
+from jodisutils.architecture.injector import inject
 from model.db_model_base import Base
 from model.job_schedule_entry import JobScheduleEntry
 from services.client_connection_service import ClientConnectionService

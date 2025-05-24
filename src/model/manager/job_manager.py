@@ -5,7 +5,6 @@ from sqlalchemy.orm import Session
 from jodiscore.exceptions.invalid_state_error import InvalidStateError
 from model.job import Job
 from model.job_schedule_entry import JobScheduleEntry
-from model.manager.client_manager import ClientManager
 from model.job_data import JobData
 
 
@@ -15,11 +14,16 @@ class JobManager:
         self._session = session
         self._id = id
 
-        self._model = self.model() if load_model else None
+        self._model = None
 
+        if load_model:
+            self.model
+
+    @property
     def model(self) -> Job:
+
         if self._model is None:
-            logging.info(f"Fetching job with id {self._id}")
+            logging.debug(f"Fetching job with id {self._id}")
             self._model = self._session.execute(
                 select(Job).where(Job.id == self._id)
             ).scalar()
@@ -40,7 +44,7 @@ class JobManager:
     def delete(session: Session, id: int, force: bool) -> None:
         logging.info(f"Deleting job with id {id}")
 
-        job = JobManager(session, id, True).model()
+        job = JobManager(session, id, True).model
 
         if job.sub_state == job.SubState.RUNNING and not force:
             raise InvalidStateError("Active jobs cannot be deleted.")
@@ -68,14 +72,16 @@ class JobManager:
         )
 
     def assign(self, client_id: int) -> None:
+        from model.manager.client_manager import ClientManager
+
         logging.info(f"Assigning job {self._id} to client {client_id}")
 
-        job = self.model()
+        job = self.model
 
         if job.state != job.State.UNASSIGNED:
             raise InvalidStateError("Job already assigned to a client")
 
-        client = ClientManager(self._session, client_id).model()
+        client = ClientManager(self._session, client_id).model
 
         next_rank = 0 if len(client.schedule) == 0 \
             else client.schedule[-1].rank + 1
@@ -88,7 +94,7 @@ class JobManager:
 
     def unassign(self, force: bool) -> None:
         logging.info(f"Unassigning job {self._id}")
-        job = self.model()
+        job = self.model
 
         if job.schedule_entry is None:
             return
@@ -99,3 +105,32 @@ class JobManager:
         self._session.delete(job.schedule_entry)
         job.state = job.State.UNASSIGNED
         job.sub_state = job.SubState.CREATED
+
+    def mark_execution_failed(self) -> None:
+        job = self.model
+        logging.info(f"Marking {job} execution as failed!")
+
+        if job.state != job.State.ASSIGNED:
+            raise InvalidStateError("Job is not assigned to a client")
+        job.sub_state = job.SubState.FAILED
+
+    def mark_execution_aborted(self) -> None:
+        job = self.model
+        logging.info(f"Marking {job} execution as aborted!")
+
+        if job.state != job.State.ASSIGNED:
+            raise InvalidStateError("Job is not assigned to a client")
+        job.sub_state = job.SubState.ABORTED
+
+    def mark_as_finished(self, result_json: str, completed: bool) -> None:
+        job = self.model
+
+        job.state = job.State.FINISHED
+
+        if completed:
+            job.sub_state = job.SubState.COMPLETED
+        else:
+            job.sub_state = job.SubState.RETURNED
+        logging.info(f"Marking {job} execution as finished ({job.sub_state})!")
+
+        job.result = result_json

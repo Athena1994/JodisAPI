@@ -2,7 +2,7 @@
 from datetime import datetime
 import enum
 
-from sqlalchemy import String
+from sqlalchemy import JSON, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
@@ -10,8 +10,9 @@ from jodiscore.dataobjects.job import JobDO
 from jodiscore.server.job_provider.job_provider_control \
     import JobProviderControl
 
-from jodisutils.injector import inject
+from jodisutils.architecture.injector import inject
 
+from jodisutils.http.static_file_provider import StaticFileProvider
 from model.db_model_base import Base
 from model.job_schedule_entry import JobScheduleEntry
 from model.job_data import JobData
@@ -22,14 +23,14 @@ class Job(Base):
 
     class SubState(enum.Enum):
         CREATED = 'CREATED'
-        RETURNED = 'RETURNED'
 
         SCHEDULED = 'SCHEDULED'
         RUNNING = 'RUNNING'
-
         FAILED = 'FAILED'
-        FINISHED = 'FINISHED'
         ABORTED = 'ABORTED'
+
+        RETURNED = 'RETURNED'
+        COMPLETED = 'COMPLETED'
 
     class State(enum.Enum):
         UNASSIGNED = 'UNASSIGNED'
@@ -54,12 +55,18 @@ class Job(Base):
     schedule_entry: Mapped[JobScheduleEntry] = relationship(
         back_populates='job', cascade='all, delete-orphan', uselist=False)
 
+    result: Mapped[str] = mapped_column("Result", JSON, nullable=True)
+
     def __repr__(self) -> str:
         return f"Job({self.id}, {self.name}, {self.state}, {self.SubState})"
 
+    def __str__(self) -> str:
+        return f"Job(id: {self.id})"
+
     @property
     @inject
-    def dataobject(self, jpc: JobProviderControl) -> JobDO:
+    def dataobject(self, jpc: JobProviderControl,
+                   sfp: StaticFileProvider) -> JobDO:
 
         if self.schedule_entry is not None:
             client_id = self.schedule_entry.client_id
@@ -81,6 +88,6 @@ class Job(Base):
 
                      config=self.data.cfg,
                      name=self.name,
-                     payload=self.data.payload_key,
+                     payload=sfp.get_file_url(self.data.payload_key, False),
 
                      timestamp=str(self.creation_timestamp))

@@ -11,7 +11,7 @@ from flask_socketio import SocketIO
 from injector import Injector
 
 from app import app_config, app_constants, app_logger, app_services
-from jodisutils.static_file_provider import StaticFileProvider
+from jodisutils.http.static_file_provider import StaticFileProvider
 from sockets.client import ClientEventNamespace
 
 from http_endpoints.clients import clients_pb

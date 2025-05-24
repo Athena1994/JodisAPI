@@ -1,17 +1,20 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, List
+from typing import List
 from jodiscore.dataobjects.module_identifier import ModuleIdentifier
 from jodiscore.dataobjects.web_component import WebComponent
 from jodiscore.exceptions.invalid_state_error import InvalidStateError
 
+from jodiscore.server.job_provider.job_provider_control \
+    import JobProviderControl
 from jodisutils.db.db_context import DBContext
+from jodisutils.architecture.injector import inject
+from jodisutils.http.static_file_provider import StaticFileProvider
 from model.manager.job_manager import JobManager
 
-if TYPE_CHECKING:
-    from model.job import Job
-    from model.manager.client_manager import ClientManager
+from model.job import Job
+from model.manager.client_manager import ClientManager
 
 
 class JobService:
@@ -20,10 +23,11 @@ class JobService:
 
     def start_job(self, job_id: int) -> None:
         with self._db.create_session() as session:
-            job = JobManager(session, job_id)
-            job_model = job.model()
-            if job_model.sub_state != Job.SubState.SCHEDULED:
-                raise InvalidStateError("Job is not in SCHEDULED state")
+            job = JobManager(session, job_id, True)
+
+            job_model = job.model
+            if job_model.state != Job.State.ASSIGNED:
+                raise InvalidStateError("Job is not in ASSIGNED state")
 
             client = ClientManager(session,
                                    job_model.schedule_entry.client_id, True)
@@ -34,30 +38,27 @@ class JobService:
 
             session.commit()
 
-    def get_config_component(self, module_id: ModuleIdentifier) -> WebComponent:
-        if module_id not in self._provider:
-            raise ValueError(f"Provider {module_id} not registered")
-        return self._provider[module_id].config_component
+    @inject
+    def get_config_component(self, module_id: ModuleIdentifier,
+                             jpc: JobProviderControl) -> WebComponent:
+        return jpc.get_provider(module_id).config_component
 
-    def get_client_module_url(self) -> str:
-        pass
+    @inject
+    def validate_job(self, module_id: ModuleIdentifier, config: dict,
+                     jpc: JobProviderControl) -> bool:
+        return jpc.get_provider(module_id).validate_config(config)
 
-    def validate_job(self, module_id: ModuleIdentifier, config: dict) -> bool:
-        if module_id not in self._provider:
-            raise ValueError(f"Provider {module_id} not registered")
-        return self._provider[module_id].validate_config(config)
-
+    @inject
     def create_job(self,
-                   module_id: int,
-                   config: dict,
-                   name: str) -> object:
+                   module_id: int, config: dict, name: str,
+                   jpc: JobProviderControl) -> object:
 
-        if module_id not in self._provider:
-            raise ValueError(f"Provider {module_id} not registered")
         if not self.validate_job(module_id, config):
             raise ValueError("Invalid job configuration")
 
-        job_data = self._provider[module_id].create_job(config)
+        provider = jpc.get_provider(module_id)
+
+        job_data = provider.create_job(config)
 
         with self._db.create_session() as session:
             job = JobManager.create(session, job_data, name)
@@ -92,6 +93,29 @@ class JobService:
         with self._db.create_session() as session:
             for id in job_ids:
                 JobManager(session, id).unassign(force)
+            session.commit()
+
+    @inject
+    def finalize_job(self, job_id: int, result: str | None,
+                     sfp: StaticFileProvider) -> None:
+
+        with self._db.create_session() as session:
+            job = JobManager(session, job_id, True)
+            job.mark_as_finished(result, result is not None)
+            try:
+                sfp.remove_file(job.model.data.payload_key, True)
+            except Exception as e:
+                payload = job.model.data.payload_key
+                logging.error(f"Failed to remove file \{payload}: {str(e)}")
+            session.commit()
+
+    def update_job_execution_state(self, job_id: int, abort: bool = False):
+        with self._db.create_session() as session:
+            job = JobManager(session, job_id, True)
+            if abort:
+                job.mark_execution_aborted()
+            else:
+                job.mark_execution_failed()
             session.commit()
 
     def get_unassigned_jobs(self) -> List:

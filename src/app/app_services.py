@@ -7,14 +7,14 @@ from app.app_config import AppConfig
 
 from jodiscore.server.job_provider.job_provider_control\
     import JobProviderControl
-from jodisutils.static_file_provider import StaticFileProvider
 from services.client_connection_service import ClientConnectionService
 from services.client_request_service import ClientRequestService
 from services.job_service import JobService
 from services.server_module_service import ServerModuleService
 from services.update_event_service import UpdateEventService
 
-from jodisutils import injector
+from jodisutils.http.static_file_provider import StaticFileProvider
+from jodisutils.architecture import injector
 from jodisutils.db.db_context import DBContext
 from jodisutils.model_managing.subject_manager import SubjectManager
 
@@ -37,7 +37,6 @@ def get_by_name(name: str):
 
 
 def init(cfg: AppConfig):
-    i = injector.get_injector()
 
     _services['sm'] = SubjectManager()
     _services['db'] = DBContext(cfg.db)
@@ -50,8 +49,13 @@ def init(cfg: AppConfig):
         = StaticFileProvider(f"{cfg.server.host}:{cfg.server.port}", 'statics')
     _services['jpc'] = JobProviderControl()
 
+    injector_obj = injector.get_injector()
     for name, service in _services.items():
-        i.bind(service.__class__, to=service)
+        injector_obj.bind(type(service), to=service)
+
+    print("registered services:")
+    for dep_type, obj in injector_obj._dependencies.items():
+        print(f"Type: {dep_type} -> {obj}")
 
 
 def flask_injector_configure(binder):
@@ -63,6 +67,7 @@ def flask_injector_configure(binder):
     binder.bind(JobService, to=get_by_name('js'), scope=singleton)
     binder.bind(StaticFileProvider, to=get_by_name('sfp'), scope=singleton)
     binder.bind(UpdateEventService, to=get_by_name('ues'), scope=singleton)
+    binder.bind(JobProviderControl, to=get_by_name('jpc'), scope=singleton)
 
 
 def start(injector: Injector):
